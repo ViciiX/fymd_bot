@@ -9,7 +9,7 @@ require("nonebot_plugin_apscheduler")
 
 from nonebot_plugin_apscheduler import scheduler
 
-MAX = 20
+MAX = 100
 DELTA = 60 * 30
 
 b = on_fullmatch("#backup", permission = SUPERUSER)

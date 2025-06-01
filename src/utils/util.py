@@ -1,4 +1,6 @@
 import math, random, os, math, zipfile
+from PIL import Image, ImageFilter
+from io import BytesIO
 from nonebot.adapters.onebot.v11 import Message
 
 def make_line(mes, char = "─"):
@@ -82,3 +84,22 @@ def zip_dir(dirpath, outFullName, exclude_dirs = []):
 		for filename in filenames:
 			zip.write(os.path.join(path, filename), os.path.join(fpath, filename))
 	zip.close()
+
+def img_process(img_bytes):
+	try:
+		img = Image.open(BytesIO(img_bytes))
+		img = img.convert("RGBA").crop((0, 0, img.size[0]+random.randint(-10, 10), img.size[1]+random.randint(-10, 10))).filter(ImageFilter.UnsharpMask(random.randint(1,5)/10, random.randint(50, 150)))
+		return img_to_bytesio(img, "PNG")
+	except Exception as e:
+		print(e)
+		return img_bytes
+
+def thumbnail(img, size):
+	img = Image.open(img)
+	img.thumbnail(size)
+	return img_to_bytesio(img, img.format if (img.format != None) else "PNG")
+
+def img_to_bytesio(img, img_format):
+	i = BytesIO()
+	img.save(i, format = img_format)
+	return i
