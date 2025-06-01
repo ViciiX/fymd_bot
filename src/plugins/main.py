@@ -49,7 +49,8 @@ sendsrc = on_fullmatch("#src", permission = SUPERUSER)
 advice_list = on_fullmatch("#adv", permission = SUPERUSER)
 show_advice = on_regex("#show (\\d+)", permission = SUPERUSER)
 reply_advice = on_regex("#reply (\\d+)\n([\\s\\S]+)", permission = SUPERUSER)
-add_present = on_regex("#code (.+)\ncoin (\\d+)\ntime (.+)\namount (.+)\ntext ([\\s\\S]+)")
+add_present = on_regex("#code (.+)\ncoin (\\d+)\ntime (.+)\namount (.+)\ntext ([\\s\\S]+)", permission = SUPERUSER)
+present_template = on_fullmatch("#code", permission = SUPERUSER)
 
 LINE = "——————————"
 
@@ -100,6 +101,10 @@ async def _(bot: Bot, args = RegexGroup()):
 	data.delete(files[int(args[0])])
 	await bot.send_group_msg(group_id = gid, message = mes)
 	await reply_advice.finish("OK")
+
+@present_template.handle()
+async def _():
+	await present_template.finish("#code xxx\ncoin xxx\ntime xxx\namount xxx\ntext xxx")
 
 @add_present.handle()
 async def _(args = RegexGroup()):
@@ -443,7 +448,7 @@ async def _(event: Event, args = RegexGroup()):
 		deadline = datetime.datetime.strptime(code.get("deadline"), "%Y-%m-%d %H:%M:%S") if (code.get("deadline") != None) else None
 		if (code.get("deadline") == None or dtime < deadline):
 			already = code.get("user", [])
-			if (code.get("count", None) == None or code.get("count", None) < len(already)):
+			if (code.get("count", None) == None or len(already) < code.get("count", None)):
 				if (event.user_id not in already):
 					amount = code.get("amount", 1)
 					text = code.get("text", None)

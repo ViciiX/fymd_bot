@@ -104,7 +104,7 @@ async def _(event: Event, args = RegexGroup()):
 async def _(event: Event):
 	item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
 	cards = {}
-	mes = [f"{event.sender.nickname} 的卡牌库：", LINE]
+	mes = [f"{event.sender.nickname} 的卡牌库：", LINE, f"总计：{len(item.items)}张"]
 	for card in item.items:
 		card_level = card.get("data", {}).get("level", None)
 		cards[card_level] = cards.get(card_level, 0) + 1
@@ -125,11 +125,12 @@ async def _(event: Event, args = RegexGroup()):
 	await Putil.reply(my_level_card, event, "\n".join(mes))
 
 @check.handle()
-async def _(event: Event, args = RegexGroup()):
+async def _(bot: Bot, event: Event, args = RegexGroup()):
 	args = list(args)
 	item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
 	index = int(args[0])
 	if (0 <= index and index < len(item.items)):
+		Putil.processing(bot, event)
 		current_item = item.items[index]
 		path = os.path.join(DataFile("[data]/DATA/card/src").path, f"{current_item["name"]}.png")
 		byte = None
@@ -144,6 +145,7 @@ async def _(event: Event, args = RegexGroup()):
 		text = current_item.get("data", {}).get("text", "")
 		if (text != ""):
 			mes.append(text)
+		Putil.sending(bot, event)
 		await Putil.reply(check, event, MessageSegment.image(byte) + "\n".join(mes))
 	else:
 		await Putil.reply(check, event, "未找到该卡牌id！")
