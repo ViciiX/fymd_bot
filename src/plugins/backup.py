@@ -10,7 +10,7 @@ require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler
 
 MAX = 20
-DELTA = 60 * 60
+DELTA = 60 * 30
 
 b = on_fullmatch("#backup", permission = SUPERUSER)
 
@@ -32,5 +32,7 @@ def backup():
 	Util.zip_dir(DataFile("[data]").path, file_path, ["DATA", "BACKUP"])
 	data.set("history.json", "history", history)
 	print("BACKUP COMPLETED")
+
+backup()
 
 scheduler.add_job(backup, "interval", seconds = DELTA)

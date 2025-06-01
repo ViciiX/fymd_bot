@@ -121,7 +121,7 @@ async def _(bot: Bot, event: Event):
 ————————————
 ✅已连续运行{Util.format_delta_time(dtime - start_time)}！
 🪐已上线{Util.format_delta_time(dtime - datetime.datetime(year = 2025, month = 4, day = 16, hour = 23, minute = 9))}！
-💾已存储{Util.format_file_size(sum([Util.get_dir_size(data.get_path(path)) for path in os.listdir(data.path) if (path != "DATA")]))}用户数据！"""
+💾已存储{Util.format_file_size(sum([Util.get_dir_size(data.get_path(path)) for path in os.listdir(data.path) if (path not in ["DATA", "BACKUP"])]))}用户数据！"""
 		await Putil.reply(atme, event, mes)
 
 @forhelp.handle()

@@ -33,9 +33,10 @@ async def _():
 		if (deadline != None):
 			deadline = datetime.datetime.strptime(deadline, "%Y-%m-%d %H:%M:%S")
 			if (dtime >= deadline):
-				data.set("removed_cards.json", pool_name, data.get("cards.json", pool_name, {}))
-				data.remove("cards.json", pool_name)
-				print(f"卡池{pool_name}超时，已移除")
+				pool_data = data.get("cards.json", pool_name, {})
+				pool_data["avaliable"] = False
+				data.set("cards.json", pool_name, pool_data)
+				print(f"卡池{pool_name}超时，已禁用")
 
 @forhelp.handle()
 async def _(event: Event, args = RegexGroup()):
@@ -67,15 +68,15 @@ async def _(event: Event, args = RegexGroup()):
 	all_card = DataFile("[data]/DATA/card").get_raw("cards.json")
 	if (args[0] == None):
 		mes = ["📎当前可用的所有卡池", LINE]
-		all_card = all_card.keys()
+		all_card = get_avaliable_pools()
 		for i in range(len(all_card)):
 			mes.append(f"{i}.{list(all_card)[i]}")
 		mes.extend([LINE, "卡池前数字为卡池id", "发送“卡池 [id]”查看详细信息"])
 		await card_pools.finish("\n".join(mes))
 	else:
 		index = int(args[0])
-		if (0 <= index and index < len(all_card.keys())):
-			pool_name = list(all_card.keys())[index]
+		if (0 <= index and index < len(get_avaliable_pools())):
+			pool_name = list(get_avaliable_pools())[index]
 			pool = all_card.get(pool_name)
 			deadline = pool.get("deadline", None)
 			mes = ["✨卡池信息✨", LINE, f"卡池名：{pool_name}"]
@@ -153,9 +154,9 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 	pool = int(args[0])
 	times = int(args[1])
 	cdata = DataFile("[data]/DATA/card")
-	if (0 <= pool and pool < len(cdata.get_raw("cards.json").keys())):
+	if (0 <= pool and pool < len(get_avaliable_pools())):
 		if (0 < times and times <= 20):
-			pool_name = list(cdata.get_raw("cards.json").keys())[pool]
+			pool_name = get_avaliable_pools()[pool]
 			cost = int(cdata.get("cards.json", pool_name, {}).get("cost", "???"))
 			if (data.remove_num("profile", "coin", times * cost)):
 				await Putil.processing(bot, event)
@@ -165,9 +166,10 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 				for card in cards:
 					level = pick_level(pool_name, card)
 					item.add(card, 1, {"level": level, "pool": pool_name, "text": cdata.get("cards.json", pool_name, {}).get("card_hint", "")})
-					with open(os.path.join(cdata.path, f"src/{card}.png"), "rb") as f:
-						mes.append(MessageSegment.image(img_process(f.read())))
-					mes.append(f"恭喜你抽到了『{level}』级卡牌：\n{card}！" + {"S": "\n运气真好！", "SSS": "\n超神！", "SSR": "\n欧皇！！！"}.get(level, ""))
+					# with open(os.path.join(cdata.path, f"src/{card}.png"), "rb") as f:
+					# 	mes.append(MessageSegment.image(img_process(f.read())))
+
+					mes.append({"S": "✨Nice！✨\n", "SSS": "🎉Ohhhhhh！🎉\n", "SSR": "🎊👑这、这是？！👑🎊\n"}.get(level, "") + f"恭喜你抽到了『{level}』级卡牌：\n{card}！" + {"S": "\nGood Luck！", "SSS": "\n欧皇！", "SSR": "\n哇！金色传说！！"}.get(level, ""))
 				await Putil.sending(bot, event)
 				await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", mes)])
 			else:
@@ -213,6 +215,14 @@ def get_all_card():
 		for level in LEVELS:
 			ac.extend(value.get(level, []))
 	return ac
+
+def get_avaliable_pools():
+	all_card = DataFile("[data]/DATA/card").get_raw("cards.json")
+	result = []
+	for pool_name, values in all_card.items():
+		if (values.get("avaliable", True) == True):
+			result.append(pool_name)
+	return result
 
 def img_process(img_bytes):
 	try:
