@@ -1,0 +1,4 @@
+/tosend
+/test
+data/*
+!/data/DATA
