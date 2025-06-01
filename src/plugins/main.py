@@ -49,7 +49,7 @@ sendsrc = on_fullmatch("#src", permission = SUPERUSER)
 advice_list = on_fullmatch("#adv", permission = SUPERUSER)
 show_advice = on_regex("#show (\\d+)", permission = SUPERUSER)
 reply_advice = on_regex("#reply (\\d+)\n([\\s\\S]+)", permission = SUPERUSER)
-add_present = on_regex("#code (.+)\namount (\\d+)\ntime (.+)\ntext ([\\s\\S]+)")
+add_present = on_regex("#code (.+)\ncoin (\\d+)\ntime (.+)\namount (.+)\ntext ([\\s\\S]+)")
 
 LINE = "——————————"
 
@@ -103,7 +103,7 @@ async def _(bot: Bot, args = RegexGroup()):
 
 @add_present.handle()
 async def _(args = RegexGroup()):
-	code = {"amount": int(args[1]), "deadline": args[2] if (args[2] not in ["None", "/", " "]) else None, "text": args[3]}
+	code = {"amount": int(args[1]), "deadline": args[2] if (args[2] not in ["None", "/", " "]) else None, "count": int(args[3]), "text": args[4]}
 	DataFile(f"[data]").set("gift_code.json", args[0], code)
 	await add_present.finish(f"添加成功：{args[0]}")
 
@@ -443,19 +443,22 @@ async def _(event: Event, args = RegexGroup()):
 		deadline = datetime.datetime.strptime(code.get("deadline"), "%Y-%m-%d %H:%M:%S") if (code.get("deadline") != None) else None
 		if (code.get("deadline") == None or dtime < deadline):
 			already = code.get("user", [])
-			if (event.user_id not in already):
-				amount = code.get("amount", 1)
-				text = code.get("text", None)
-				user.add_num("profile", "coin", amount)
-				already.append(event.user_id)
-				code["user"] = already
-				codes.set("gift_code.json", args[0].lower(), code)
-				mes = ["🎉✨兑换成功！✨🎉", f"🦌币 + {amount} ！"]
-				if (text != None):
-					mes.extend([LINE, text])
-				await Putil.reply(present, event, "\n".join(mes))
+			if (code.get("count", None) == None or code.get("count", None) < len(already)):
+				if (event.user_id not in already):
+					amount = code.get("amount", 1)
+					text = code.get("text", None)
+					user.add_num("profile", "coin", amount)
+					already.append(event.user_id)
+					code["user"] = already
+					codes.set("gift_code.json", args[0].lower(), code)
+					mes = ["🎉✨兑换成功！✨🎉", f"🦌币 + {amount} ！"]
+					if (text != None):
+						mes.extend([LINE, text])
+					await Putil.reply(present, event, "\n".join(mes))
+				else:
+					await Putil.reply(present, event, "你已经领取过了！")
 			else:
-				await Putil.reply(present, event, "你已经领取过了！")
+				await Putil.reply(present, event, "被领取完啦！")
 		else:
 			await Putil.reply(present, event, "兑换码已过期！")
 	else:
