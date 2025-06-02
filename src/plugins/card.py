@@ -13,7 +13,7 @@ from ..utils import plugin_util as Putil
 detect_pool_avaliable = on_message(block = False)
 forhelp = on_regex("^卡牌帮助 (\\d+)$|^卡牌帮助$")
 my_card = on_fullmatch("我的卡牌")
-my_level_card = on_regex("^我的卡牌 (C|B|A|S|SSS|SSR)$")
+my_level_card = on_regex("^我的卡牌 (C|B|A|S|SSS|SSR|c|b|a|s|sss|ssr)$")
 card_pools = on_regex("^卡池 (\\d+)$|^卡池$")
 get_cards = on_regex("^抽卡 (\\d+) (\\d+)$")
 check = on_regex("^查看卡牌 (\\d+)$")
@@ -66,10 +66,13 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 	all_card = DataFile("[data]/DATA/card").get_raw("cards.json")
 	if (args[0] == None):
 		mes = ["📎当前可用的所有卡池", LINE]
-		all_card = get_avaliable_pools()
-		for i in range(len(all_card)):
-			mes.append(f"{i}.{list(all_card)[i]}")
-		mes.extend([LINE, "卡池前数字为卡池id", "发送“卡池 [id]”查看详细信息"])
+		pools = get_avaliable_pools()
+		for i in range(len(pools)):
+			pool_name = list(pools)[i]
+			pool = all_card.get(pool_name)
+			status = "💥" if (pool.get("deadline", None) != None) else "✅"
+			mes.append(f"{i}.{status}{pool_name}")
+		mes.extend([LINE, "卡池名称前的数字为卡池id", "✅为常驻卡池, 💥为限时卡池", "发送“卡池 [id]”查看详细信息"])
 		await card_pools.finish("\n".join(mes))
 	else:
 		index = int(args[0])
@@ -78,28 +81,27 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 			pool_name = list(get_avaliable_pools())[index]
 			pool = all_card.get(pool_name)
 			deadline = pool.get("deadline", None)
-			mes = ["✨卡池信息✨", LINE, f"卡池名：{pool_name}", f"卡池id：{index}"]
+			mes = ["✨卡池信息✨", LINE, f"卡池名：{pool_name}", f"卡池id：{index}", f"卡池内卡牌所属卡池：{pool.get("reindex_pool", pool_name)}"]
 			amounts = [len(pool.get(level, [])) for level in LEVELS]
 			mes.extend([f"卡牌数：{sum(amounts)}张", f"价格：{pool.get("cost", "???")}🦌币/抽"])
 			if (deadline != None):
 				dtime = datetime.datetime.now()
 				deadline = datetime.datetime.strptime(deadline, "%Y-%m-%d %H:%M:%S")
-				mes.append(f"💥限时时间： {Util.format_delta_time(deadline - dtime)}")
+				mes.append(f"💥限时卡池： 还剩{Util.format_delta_time(deadline - dtime)}")
 			else:
-				mes.append(f"✅时间不限")
+				mes.append(f"✅常驻卡池")
 			mes.append(LINE)
 			weight = pool.get("weight", {})
 			weight_total = sum([weight.get(level) for level in LEVELS if (weight.get(level, None) != None)])
 			msg = []
 			for level in LEVELS:
 				if (level in pool):
-					mes.append(f"『{level}』{amounts[LEVELS.index(level)]}张 ({weight.get(level, 0)/weight_total*100}%)")
-					msg.append(f"『{level}』级卡牌：\n" + "\n".join(pool.get(level)))
+					mes.append(f"『{level}』{amounts[LEVELS.index(level)]}张 ({round(weight.get(level, 0)/weight_total*100, 2)}%)")
+					msg.append(f"『{level}』级卡牌一览：\n" + "\n".join(pool.get(level)))
 			mes.extend([LINE, "卡池介绍：", pool.get("text", "无")])
 			msg.insert(0, "\n".join(mes))
 			await Putil.sending(bot, event)
 			await Putil.send_forward_msg(bot, event, {"bot": (Putil.bot_id, "FyMd卡池")}, [("bot", msg)])
-
 		else:
 			await card_pools.finish("卡池不存在！")
 
@@ -123,8 +125,8 @@ async def _(event: Event):
 @my_level_card.handle()
 async def _(event: Event, args = RegexGroup()):
 	item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
-	s = Item.format([x for x in item.items if (x.get("data", {}).get("level", None) == args[0])], "[call:get_id].【[data:level]】[name] * [amount]", callables = {"get_id": [get_id, {"items": item.items}]})
-	mes = [f"{event.sender.nickname} 的『{args[0]}』级卡牌：", LINE] + s.split("\n")
+	s = Item.format([x for x in item.items if (x.get("data", {}).get("level", None) == args[0].upper())], "[call:get_id].【[data:level]】[name] * [amount]", callables = {"get_id": [get_id, {"items": item.items}]})
+	mes = [f"{event.sender.nickname} 的『{args[0].upper()}』级卡牌：", LINE] + s.split("\n")
 	mes.append(LINE)
 	mes.append("卡牌前数字为背包内卡牌id")
 	mes.append("发送“查看卡牌 【卡牌id】”查看卡牌信息")
@@ -165,12 +167,14 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 	if (0 <= pool and pool < len(get_avaliable_pools())):
 		if (0 < times and times <= 20):
 			pool_name = get_avaliable_pools()[pool]
-			cost = int(cdata.get("cards.json", pool_name, {}).get("cost", "???"))
+			pool_data = cdata.get("cards.json", pool_name, {})
+			cost = int(pool_data.get("cost", "???"))
+			real_pool_name = pool_data.get("reindex_pool", pool_name)
 			if (data.remove_num("profile", "coin", times * cost)):
 				await Putil.processing(bot, event)
 				cards = get_card(pool_name, times)
 				item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
-				mes = [f"{event.sender.nickname} 的{times}连抽卡记录", f"卡池：{pool_name}", f"卡牌图片为缩略图，原图请在“我的卡牌”中查看"]
+				mes = [f"{event.sender.nickname} 的{times}连抽卡记录", f"卡池：{real_pool_name}", f"消费：{times * cost}🦌币", f"卡牌图片为缩略图，原图请发送“我的卡牌”查看"]
 				for card in cards:
 					level = pick_level(pool_name, card)
 					item.add(card, 1, {"level": level, "pool": pool_name, "text": cdata.get("cards.json", pool_name, {}).get("card_hint", "")})

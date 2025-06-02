@@ -28,6 +28,7 @@ runtime.set("runtime", "time", datetime.datetime.now().timestamp())
 
 atme = on_message(rule = to_me(), priority = 2, block = True)
 impart_receive = on_message(priority = 2, block = True)
+detect_present_avaliable = on_message(block = False)
 
 fymd = on_regex("^方悦名都$|^FYMD$")
 forhelp = on_regex("^帮助 (\\d+)$|^帮助$")
@@ -37,6 +38,8 @@ profile = on_fullmatch("个人面板")
 rate = on_regex("^鹿 (\\d+)$")
 luclock = on_fullmatch("鹿钟")
 cum = on_regex("^鹿$|^🦌$", rule = to_me())
+start_cum = on_regex("^开鹿$|^开🦌$", rule = to_me())
+end_cum = on_regex("^鹿完了$|^🦌完了$", rule = to_me())
 can_lu_today = on_fullmatch("今天鹿吗", rule = to_me())
 advice = on_regex("^建议\n(.+)\n([\\s\\S]+)$")
 subscribe_impart = on_regex("^订阅音趴$|^订阅一起听$")
@@ -120,13 +123,19 @@ async def _(bot: Bot, event: Event):
 		start_time = runtime.get("runtime", "time", dtime.timestamp)
 		start_time = datetime.datetime.fromtimestamp(start_time)
 		data = DataFile("[data]")
+		code = DataFile("[main]")
+		lines = 0
+		for file_path in [os.path.join(code.get_path("src/plugins"), x) for x in os.listdir(code.get_path("src/plugins")) if (x.endswith(".py"))] + [os.path.join(code.get_path("src/utils"), x) for x in os.listdir(code.get_path("src/utils")) if (x.endswith(".py"))]:
+			with open(file_path, "r", encoding = "utf-8") as f:
+				lines += len(f.readlines())
 		mes = f"""[𝕱𝖚𝖈𝖐 𝖄𝖔𝖚 𝕸𝖊𝖑𝖔𝖉𝖎𝖈 𝕯𝖚𝖇𝖘𝖙𝖊𝖕]
 专属机器人 unOFFICIAL
 发送“帮助”获取所有功能
 ————————————
 ✅已连续运行{Util.format_delta_time(dtime - start_time)}！
 🪐已上线{Util.format_delta_time(dtime - datetime.datetime(year = 2025, month = 4, day = 16, hour = 23, minute = 9))}！
-💾已存储{Util.format_file_size(sum([Util.get_dir_size(data.get_path(path)) for path in os.listdir(data.path) if (path not in ["DATA", "BACKUP"])]))}用户数据！"""
+💾已存储{Util.format_file_size(sum([Util.get_dir_size(data.get_path(path)) for path in os.listdir(data.path) if (path not in ["DATA", "BACKUP"])]))}用户数据！
+🔥已拥有{lines}行代码！"""
 		await Putil.reply(atme, event, mes)
 
 @forhelp.handle()
@@ -178,7 +187,7 @@ async def _(event: Event):
 	if (time >= (last_time+datetime.timedelta(days = 1))):
 		is_first = False
 		coin = data.get("profile", "coin", 0)
-		amount = random.randint(10, 20)
+		amount = random.randint(30, 60)
 		group = DataFile()
 		first_time = datetime.datetime.strptime(group.get("sign", "last_sign_time", (time-datetime.timedelta(days = 2)).strftime("%Y-%m-%d")), "%Y-%m-%d")
 		count = group.get("sign", "count", 0)
@@ -263,11 +272,11 @@ async def _(event: Event):
 			days = months.loc[dtime.month]
 			month_length = calendar.monthrange(dtime.year, dtime.month)[1]
 
-			months_count_df = months.map(lambda x: x.get("count",0) if (type(x) == dict) else 0)
+			months_count_df = months.map(lambda x: x.get("count", 0) if (type(x) == dict) else 0) #12个月
 			days_count_df = months_count_df.loc[dtime.month]
 
 			day_count = days.at[dtime.day].get("count", 0)
-			month_count = months_count_df.sum().sum()
+			month_count = days_count_df.sum()
 			month_average = round(month_length/(days_count_df.sum()),2)
 			year_average = round((366 if (calendar.isleap(dtime.year)) else 365)/total_count,2)
 			if (dtime.day > dtime.weekday()):
@@ -306,8 +315,17 @@ async def _(event: Event):
 		await Putil.reply(luclock, event, mes)
 	else:
 		await Putil.reply(luclock, event, """未记录~
-🦌后@我发送“🦌”或“鹿”来记录🦌的情况吧！""")
+🦌后@我发送“🦌”或“鹿”来记录🦌的情况吧！
+如果想要记录🦌的时间，可以使用“开鹿”和“鹿完了”""")
 
+@start_cum.handle()
+async def _(event: Event):
+	data = DataFile(f"[data]/user/{event.user_id}/lu_info")
+	dtime = datetime.datetime.now()
+	data.set("luclock", "start_time", dtime.strftime("%Y-%m-%d %H:%M:%S"))
+	await Util.reply(start_cum, event, "已记录开始时间！开🦌！")
+
+@end_cum.handle()
 @cum.handle()
 async def _(event: Event):
 	data = DataFile(f"[data]/user/{event.user_id}/lu_info")
@@ -326,6 +344,17 @@ async def _(event: Event):
 	cld.at[dtime.year, "count"] += 1 #年次数
 	day["count"] = count
 	day["times"] = times
+
+	#鹿的用时
+	start_time = data.get("luclock", "start_time", None)
+	using_delta_time = None
+	if (start_time != None):
+		start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+		using_delta_time = dtime - start_time
+		if (using_delta_time.days == 0):
+			day["using_time"] = [using_delta_time.days, using_delta_time.seconds, using_delta_time.microseconds]
+			using_delta_time = Util.format_delta_time(using_delta_time)
+
 	data.set("luclock", "last_time", dtime.strftime("%Y-%m-%d %H:%M:%S"))
 	data.set_dataframe("pickle", "calendar", cld)
 	data.set_dataframe("json", "calendar", cld) #仅用于查看
@@ -341,12 +370,15 @@ async def _(event: Event):
 			data.set("luclock", "max_delta_time", [delta_time.days, delta_time.seconds, delta_time.microseconds])
 		delta_time = Util.format_delta_time(delta_time)
 
-	await Putil.reply(cum, event, MessageSegment.at(event.user_id) + f""" 哎哟卧槽，你🦌！
+	mes = f""" 哎哟卧槽，你🦌！
 💖今天第{count}🦌！
-✅已计入🦌钟
-""" + (f"""
-⏰上次时间：{last_time}
-😈间隔时间：{delta_time}""" if (last_time != None) else ""))
+✅已计入🦌钟""".split("\n")
+	if (last_time != None):
+		mes.extends([f"⏰上次时间：{last_time}", f"😈间隔时间：{delta_time}"])
+	if (type(using_delta_time) == str):
+		mes.append(f"🐍本次持续时间：{using_delta_time}")
+
+	await Putil.reply(cum, event, MessageSegment.at(event.user_id) + "\n".join(mes))
 
 @can_lu_today.handle()
 async def _(bot: Bot, event: Event):
@@ -438,11 +470,35 @@ async def _(bot: Bot, event: Event):
 	s.append(f"第{user[0]+1}名 - {user[1]}")
 	await topcoin.finish("\n".join(s))
 
+@detect_present_avaliable.handle()
+async def _(event: Event):
+	data = DataFile(f"[data]")
+	code = data.get_raw("gift_code.json")
+	dtime = datetime.datetime.now()
+	for code_name, value in code.items():
+		is_remove = False
+		#时间检测
+		if (value.get("deadline", None) != None):
+			deadline = datetime.datetime.strptime(value.get("deadline", None), "%Y-%m-%d %H:%M:%S")
+			if (deadline < dtime):
+				is_remove = True
+
+		#次数检测
+		if (value.get("count", None) != None):
+			if (value.get("count", None) <= len(value.get("user", []))):
+				is_remove = True
+		
+		if (is_remove):
+			print(f"GIFT CODE --> {code_name} REMOVED")
+			if (value.get("temp", False) == False):
+				data.set("gift_code_histroy.json", code_name, value)
+			data.remove("gift_code.json", code_name)
+
 @present.handle()
 async def _(event: Event, args = RegexGroup()):
 	user = DataFile(f"[data]/user/{event.user_id}")
 	codes = DataFile(f"[data]")
-	code = codes.get("gift_code.json", args[0].lower(), None)
+	code = codes.get("gift_code.json", args[0], None)
 	if (code != None):
 		dtime = datetime.datetime.now()
 		deadline = datetime.datetime.strptime(code.get("deadline"), "%Y-%m-%d %H:%M:%S") if (code.get("deadline") != None) else None
@@ -455,7 +511,7 @@ async def _(event: Event, args = RegexGroup()):
 					user.add_num("profile", "coin", amount)
 					already.append(event.user_id)
 					code["user"] = already
-					codes.set("gift_code.json", args[0].lower(), code)
+					codes.set("gift_code.json", args[0], code)
 					mes = ["🎉✨兑换成功！✨🎉", f"🦌币 + {amount} ！"]
 					if (text != None):
 						mes.extend([LINE, text])

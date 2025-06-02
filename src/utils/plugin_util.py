@@ -51,9 +51,9 @@ async def send_forward_msg(
 		else:
 			messages.append(to_json(mes[0], mes[1]))
 	if (isinstance(event, GroupMessageEvent)):
-		await bot.call_api("send_group_forward_msg", group_id=event.group_id, messages=messages)
+		await bot.call_api("send_group_forward_msg", group_id = event.group_id, messages = messages)
 	else:
-		await bot.call_api("send_private_forward_msg", user_id=event.user_id, messages=messages)
+		await bot.call_api("send_private_forward_msg", user_id = event.user_id, messages = messages)
 
 async def ban(matcher, event):
 	if (isinstance(event, GroupMessageEvent)):
