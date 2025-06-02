@@ -150,6 +150,17 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 拥有者：{event.sender.nickname}
 拥有数量：{current_item.get("amount", "?")}""".split("\n")
 		mes.append(LINE)
+
+		data = DataFile("[data]")
+		analysis = data.get_multi_files("user", "[read]/card/mycard.json", {"items": []})
+		all_user = len(analysis)
+		analysis = [x["values"]["items"] for x in analysis if (x["values"] != {"items": []})]
+		analysis = [x for x in analysis if (x != [])]
+		count = 0
+		for user_items in analysis:
+			if (Item.value_find(user_items, current_item["name"], current_item["data"] if (current_item["data"] != {}) else None)[1] != None):
+				count += 1
+		mes.extend([f"全服拥有人数：{count}【{round(count / all_user * 100, 5)}%】", LINE])
 		text = current_item.get("data", {}).get("text", "")
 		if (text != ""):
 			mes.append(text)
@@ -175,13 +186,25 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 				cards = get_card(pool_name, times)
 				item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
 				mes = [f"{event.sender.nickname} 的{times}连抽卡记录", f"卡池：{real_pool_name}", f"消费：{times * cost}🦌币", f"卡牌图片为缩略图，原图请发送“我的卡牌”查看"]
+				level_count = {}
 				for card in cards:
 					level = pick_level(pool_name, card)
-					item.add(card, 1, {"level": level, "pool": pool_name, "text": cdata.get("cards.json", pool_name, {}).get("card_hint", "")})
+					level_count[level] = level_count.get(level, 0) + 1
+					item_data = {"level": level, "pool": pool_name, "text": cdata.get("cards.json", pool_name, {}).get("card_hint", "")}
+					item.add(card, 1, item_data, False)
 					mes.append(MessageSegment.image(Util.thumbnail(os.path.join(cdata.path, f"src/{card}.png"), (100, 150))))
 					mes.append({"S": "✨Nice！✨\n", "SSS": "🎉Ohhhhhh！🎉\n", "SSR": "🎊👑这、这是？！👑🎊\n"}.get(level, "") + f"恭喜你抽到了『{level}』级卡牌：\n{card}！" + {"S": "\nGood Luck！", "SSS": "\n欧皇！", "SSR": "\n哇！金色传说！！"}.get(level, ""))
+				item.save()
+				total_mes = ["🎉本次抽卡获得🎉"]
+				for level in LEVELS:
+					if (level in level_count):
+						total_mes.append(f"『{level}』级卡牌：{level_count[level]} 张！")
+				mes.append("\n".join(total_mes))
 				await Putil.sending(bot, event)
-				await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", mes)])
+				try:
+					await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", mes)])
+				except Exception as e:
+					await Putil.reply(get_cards, event, f"消息被风控发送失败了！😭\n但是卡牌已到账，没有消失✅")
 			else:
 				await Putil.reply(get_cards, event, f"需要{times * cost}🦌币！")
 		else:

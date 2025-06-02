@@ -240,24 +240,23 @@ class Item:
 		self.data.set(self.file, "items", self.items)
 
 	def find(self, tname, tdata = None):
-		for i in range(len(self.items)):
-			name = self.items[i]["name"]
-			data = self.items[i]["data"]
-			if (name == tname and (data == tdata or tdata == None)):
-				return (i, self.items[i])
-		return (-1, None)
+		return Item.value_find(self.items, tname, tdata)
 
 	def in_range(self, tname, num_range, tdata = None):
 		item = self.find(tname, tdata)[1]
 		return num_range[0] <= item["amount"] and item["amount"] < num_range[1] 
 
-	def add(self, tname, amount, tdata = None):
-		item = self.find(tname, tdata)
-		if (item[0] == -1):
-			self.items.append({"name": tname, "amount": amount, "data": tdata if (tdata != None) else {}})
-		else:
-			self.items[item[0]]["amount"] += amount
-		self.save()
+	def add(self, tname, amount, tdata = None, is_save = True):
+		self.items = Item.value_add(self.items, tname, amount, tdata)
+		if (is_save):
+			self.save()
+
+	def add_by_list(self, item_list, is_save = True):
+		add_items = []
+		for item in item_list:
+			add_items = Item.value_add(add_items, item["name"], item["amount"], item.get("data", None))
+		for i in add_items:
+			self.add(i["name"], i["amount"], i.get("data", None), is_save)
 
 	def remove(self, tname, amount, tdata = None):
 		item = self.find(tname, tdata)
@@ -273,6 +272,24 @@ class Item:
 
 	def format_items(template, limit = -1, callables = {}):
 		return Item.format(self.items, template, limit)
+
+	@staticmethod
+	def value_find(values, name, data = None):
+		for i in range(len(values)):
+			tname = values[i]["name"]
+			tdata = values[i]["data"]
+			if (name == tname and (data == tdata or data == None)):
+				return (i, values[i])
+		return (-1, None)
+
+	@staticmethod
+	def value_add(origin_values, name, amount, data = None):
+		item = Item.value_find(origin_values, name, data)
+		if (item[0] == -1):
+			origin_values.append({"name": name, "amount": amount, "data": data if (data != None) else {}})
+		else:
+			origin_values[item[0]]["amount"] += amount
+		return origin_values
 
 	@staticmethod
 	def format(items, template, limit = -1, callables = {}):

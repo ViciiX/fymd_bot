@@ -20,7 +20,14 @@ first_time = True
 
 code_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-async def summon_code():
+drop_it = on_fullmatch("#drop", permission = SUPERUSER)
+
+@drop_it.handle()
+async def _():
+	await summon_code(False)
+	await drop_it.finish("Dropped it")
+
+async def summon_code(loop = True):
 	global first_time
 	dtime = datetime.datetime.now()
 	next_time = get_normal_random(10, 200, 1, 0)[0] * 60
@@ -39,13 +46,19 @@ async def summon_code():
 		first_time = False
 
 	run_time = dtime + datetime.timedelta(seconds = next_time)
-	print(f"wait_time --> {next_time/60}min")
-	scheduler.add_job(summon_code, "date", run_date = run_time)
+	if (loop):
+		print(f"wait_time --> {next_time/60}min")
+		scheduler.add_job(summon_code, "date", run_date = run_time)
 
 def add_code(name, amount, deadline, count, text, temp):
 	code = locals()
+	data = DataFile(f"[data]")
 	del code["name"]
-	DataFile(f"[data]").set("gift_code.json", name, code)
+	data.set("gift_code.json", name, code)
+	history = data.get("gift_code_temp.json", "codes", [])
+	history = set(history)
+	history.add(name)
+	data.set("gift_code_temp.json", "codes", list(history))
 
 def get_fymd_bot():
 	global bot

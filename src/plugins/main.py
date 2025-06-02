@@ -135,7 +135,10 @@ async def _(bot: Bot, event: Event):
 ✅已连续运行{Util.format_delta_time(dtime - start_time)}！
 🪐已上线{Util.format_delta_time(dtime - datetime.datetime(year = 2025, month = 4, day = 16, hour = 23, minute = 9))}！
 💾已存储{Util.format_file_size(sum([Util.get_dir_size(data.get_path(path)) for path in os.listdir(data.path) if (path not in ["DATA", "BACKUP"])]))}用户数据！
-🔥已拥有{lines}行代码！"""
+🔥已拥有{lines}行代码！
+😼Github地址:
+https://github.com/ViciiX/fymd_bot
+🌟欢迎Star！"""
 		await Putil.reply(atme, event, mes)
 
 @forhelp.handle()
@@ -523,7 +526,11 @@ async def _(event: Event, args = RegexGroup()):
 		else:
 			await Putil.reply(present, event, "兑换码已过期！")
 	else:
-		await Putil.reply(present, event, "兑换码不存在！")
+		temp = codes.get("gift_code_temp.json", "codes", set())
+		if (args[0] in temp):
+			await Putil.reply(present, event, "兑换码已过期！下次要快点哦")
+		else:
+			await Putil.reply(present, event, "兑换码不存在！")
 
 
 def get_year_calendar(year):
