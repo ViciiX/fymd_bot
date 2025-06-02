@@ -153,14 +153,13 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 
 		data = DataFile("[data]")
 		analysis = data.get_multi_files("user", "[read]/card/mycard.json", {"items": []})
-		all_user = len(analysis)
 		analysis = [x["values"]["items"] for x in analysis if (x["values"] != {"items": []})]
-		analysis = [x for x in analysis if (x != [])]
+		all_user = len(analysis)
 		count = 0
 		for user_items in analysis:
 			if (Item.value_find(user_items, current_item["name"], current_item["data"] if (current_item["data"] != {}) else None)[1] != None):
 				count += 1
-		mes.extend([f"全服拥有人数：{count}【{round(count / all_user * 100, 5)}%】", LINE])
+		mes.extend([f"全服拥有人数：{count}/{all_user}【{round(count / all_user * 100, 5)}%】", LINE])
 		text = current_item.get("data", {}).get("text", "")
 		if (text != ""):
 			mes.append(text)
