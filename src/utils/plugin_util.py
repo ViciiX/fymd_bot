@@ -60,3 +60,10 @@ async def ban(matcher, event):
 		data = DataFile("[data]/group")
 		if (data.get(event.group_id, "r18_mode", False) == False):
 			await matcher.finish("⛔该功能已被禁止！！！⛔")
+
+async def get_message(bot, event, mid, count = 1):
+	if (isinstance(event, GroupMessageEvent)):
+		mes = await bot.get_group_msg_history(group_id = event.group_id, message_id = mid, count = count)
+	else:
+		mes = await bot.get_friend_msg_history(user_id = event.user_id, message_id = mid, count = count)
+	return mes["messages"]

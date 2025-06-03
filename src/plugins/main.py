@@ -33,6 +33,7 @@ detect_present_avaliable = on_message(block = False)
 fymd = on_regex("^方悦名都$|^FYMD$")
 forhelp = on_regex("^帮助 (\\d+)$|^帮助$")
 
+get_link = on_fullmatch("直链", rule = to_me())
 sign = on_fullmatch("签到")
 profile = on_fullmatch("个人面板")
 rate = on_regex("^鹿 (\\d+)$")
@@ -326,7 +327,7 @@ async def _(event: Event):
 	data = DataFile(f"[data]/user/{event.user_id}/lu_info")
 	dtime = datetime.datetime.now()
 	data.set("luclock", "start_time", dtime.strftime("%Y-%m-%d %H:%M:%S"))
-	await Util.reply(start_cum, event, "已记录开始时间！开🦌！")
+	await Putil.reply(start_cum, event, "已记录开始时间！开🦌！")
 
 @end_cum.handle()
 @cum.handle()
@@ -377,7 +378,7 @@ async def _(event: Event):
 💖今天第{count}🦌！
 ✅已计入🦌钟""".split("\n")
 	if (last_time != None):
-		mes.extends([f"⏰上次时间：{last_time}", f"😈间隔时间：{delta_time}"])
+		mes.extend([f"⏰上次时间：{last_time}", f"😈间隔时间：{delta_time}"])
 	if (type(using_delta_time) == str):
 		mes.append(f"🐍本次持续时间：{using_delta_time}")
 
@@ -531,6 +532,26 @@ async def _(event: Event, args = RegexGroup()):
 			await Putil.reply(present, event, "兑换码已过期！下次要快点哦")
 		else:
 			await Putil.reply(present, event, "兑换码不存在！")
+
+@get_link.handle()
+async def _(bot: Bot, event: Event):
+	if (event.original_message[0].type == "reply"):
+		target_message = await Putil.get_message(bot, event, event.original_message[0].data["id"])
+		mes = ["获取结果：\n（语音貌似会出错）"]
+		print(target_message[0]["message"])
+		for segment in target_message[0]["message"]:
+			data = segment["data"]
+			if (segment["type"] == "image"):
+				mes.append(f"【图片】【{data["filename"]}】\n{data["file"]}\n")
+			elif (segment["type"] == "video"):
+				mes.append(f"【视频】\n{data["file"]}")
+			elif (segment["type"] == "record"):
+				mes.append(f"【语音】\n{data["file"]}")
+			elif (segment["type"] == "text"):
+				mes.append({data["text"]})
+		await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd直链获取工具"]}, [("bot", mes)])
+	else:
+		await Putil.reply(get_link, event, "请回复包含想要获取直链的资源的消息！")
 
 
 def get_year_calendar(year):
