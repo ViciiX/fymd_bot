@@ -1,6 +1,9 @@
-import qrcode, random
-from PIL import Image, ImageFilter
+import qrcode, random, math
+from PIL import Image, ImageFilter, ImageFont
 from io import BytesIO
+from pilmoji import Pilmoji
+
+from .file import DataFile
 
 def img_process(img_bytes):
 	try:
@@ -26,3 +29,38 @@ def get_qr(text, fill_color = "black", back_color = "white"):
 	qr.add_data(text)
 	qr.make(fit=True)
 	return qr.make_image(fill_color = fill_color, back_color = back_color)
+
+def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "Noto", font_size = 32, font_color = "black", margin = 20, min_size = (256, 256), in_bytes = True):
+	texts = []
+	d = DataFile("[data]/DATA/font")
+	raw_texts = [raw_texts] if (type(raw_texts) == str) else raw_texts
+	for text in raw_texts:
+		texts.extend(text.split("\n"))
+	texts = [x if (x != "") else "\n" for x in texts]
+	font = ImageFont.truetype(d.get_path(f"{font_name}.ttf"), size = font_size)
+	
+	if (width == None):
+		width = max([font.getbbox(text)[2] for text in texts])
+	else:
+		if (width == "square"):
+			box = font.getbbox("\n".join(texts))
+			width = round(math.sqrt(box[2] * box[3]))
+		new_texts = []
+		for text in texts:
+			s = ""
+			for char in text:
+				if (font.getbbox(s + char)[2] > width):
+					new_texts.append(s)
+					s = ""
+				s += char
+			if (s != ""):
+				new_texts.append(s)
+		texts = new_texts
+
+	width = max(min_size[0], width + margin * 2)
+	height = max(min_size[1], margin * 2 + sum([font.getbbox(text)[3] for text in texts]))
+	
+	with Image.new(mode = "RGBA", size = (width, height), color = bg_color) as img:
+		with Pilmoji(img) as draw:
+			draw.text(xy = (margin, margin), text = "\n".join(texts), fill = font_color, font = font, emoji_scale_factor = 0.9)
+			return img_to_bytesio(img) if (in_bytes) else img

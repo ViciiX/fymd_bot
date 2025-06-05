@@ -41,6 +41,7 @@ class DataFile:
 					self.error = ""
 					return json.loads(file.read())
 				except Exception as err:
+					print(err)
 					self.error = err
 					return False
 		except Exception as e:

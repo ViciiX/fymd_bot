@@ -19,6 +19,7 @@ my_level_card = on_regex("^我的卡牌 (C|B|A|S|SSS|SSR|c|b|a|s|sss|ssr)$")
 card_pools = on_regex("^卡池 (\\d+)$|^卡池$")
 get_cards = on_regex("^抽卡 (\\d+) (\\d+)$")
 check = on_regex("^查看卡牌 (\\d+)$")
+daily_bro = on_fullmatch("每日群友")
 
 LINE = "——————————"
 LEVELS = ['SSR', 'SSS', 'S', 'A', 'B', 'C']
@@ -83,7 +84,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 			pool_name = list(get_avaliable_pools())[index]
 			pool = all_card.get(pool_name)
 			deadline = pool.get("deadline", None)
-			mes = ["✨卡池信息✨", LINE, f"卡池名：{pool_name}", f"卡池id：{index}", f"卡池内卡牌所属卡池：{pool.get("reindex_pool", pool_name)}"]
+			mes = ["✨卡池信息✨", LINE, f"卡池名：{pool_name}", f"卡池id：{index}"]
 			amounts = [len(pool.get(level, [])) for level in LEVELS]
 			mes.extend([f"卡牌数：{sum(amounts)}张", f"价格：{pool.get("cost", "???")}🦌币/抽"])
 			if (deadline != None):
@@ -103,7 +104,10 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 			mes.extend([LINE, "卡池介绍：", pool.get("text", "无")])
 			msg.insert(0, "\n".join(mes))
 			await Putil.sending(bot, event)
-			await Putil.send_forward_msg(bot, event, {"bot": (Putil.bot_id, "FyMd卡池")}, [("bot", msg)])
+			try:
+				await Putil.send_forward_msg(bot, event, {"bot": (Putil.bot_id, "FyMd卡池")}, [("bot", msg)])
+			except Exception as e:
+				await card_pools.finish(MessageSegment.image(ImageUtil.text_to_image("\n\n".join(msg), width = None)))
 		else:
 			await card_pools.finish("卡池不存在！")
 
@@ -177,20 +181,20 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 			pool_name = get_avaliable_pools()[pool]
 			pool_data = cdata.get("cards.json", pool_name, {})
 			cost = int(pool_data.get("cost", "???"))
-			real_pool_name = pool_data.get("reindex_pool", pool_name)
 			if (data.remove_num("profile", "coin", times * cost)):
 				await Putil.processing(bot, event)
 				cards = get_card(pool_name, times)
 				item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
-				mes = [f"{event.sender.nickname} 的{times}连抽卡记录", f"卡池：{real_pool_name}", f"消费：{times * cost}🦌币", f"卡牌图片为缩略图，原图请发送“我的卡牌”查看"]
+				mes = [f"{event.sender.nickname} 的{times}连抽卡记录", f"卡池：{pool_name}", f"消费：{times * cost}🦌币", f"卡牌图片为缩略图，原图请发送“我的卡牌”查看"]
 				level_count = {}
 				for card in cards:
-					level = pick_level(pool_name, card)
+					card_name = card[0]
+					card_data = card[1]
+					level = card_data["level"]
 					level_count[level] = level_count.get(level, 0) + 1
-					item_data = {"level": level, "pool": pool_name, "text": cdata.get("cards.json", pool_name, {}).get("card_hint", "")}
-					item.add(card, 1, item_data, False)
-					mes.append(MessageSegment.image(ImageUtil.thumbnail(get_card_image(card, level, False), (100, 150))))
-					mes.append({"S": "✨Nice！✨\n", "SSS": "🎉Ohhhhhh！🎉\n", "SSR": "🎊👑这、这是？！👑🎊\n"}.get(level, "") + f"恭喜你抽到了『{level}』级卡牌：\n{card}！" + {"S": "\nGood Luck！", "SSS": "\n欧皇！", "SSR": "\n哇！金色传说！！"}.get(level, ""))
+					item.add(card_name, 1, card_data, False)
+					mes.append(MessageSegment.image(ImageUtil.thumbnail(get_card_image(card_name, level, False), (100, 150))))
+					mes.append({"S": "✨Nice！✨\n", "SSS": "🎉Ohhhhhh！🎉\n", "SSR": "🎊👑这、这是？！👑🎊\n"}.get(level, "") + f"恭喜你抽到了『{level}』级卡牌：\n{card_name}！" + {"S": "\nGood Luck！", "SSS": "\n欧皇！", "SSR": "\n哇！金色传说！！"}.get(level, ""))
 				item.save()
 				total_mes = ["🎉本次抽卡获得🎉"]
 				for level in LEVELS:
@@ -206,7 +210,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 						await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", ["(图片发送失败)"]+[x for x in mes if (type(x) == str)])])
 					except Exception as e:
 						print(f"发送纯文字卡牌结果错误：{e}")
-						await Putil.reply(get_cards, event, "消息被风控发送失败了！😭\n可以扫描二维码查看结果：" + MessageSegment.image(ImageUtil.img_to_bytesio(ImageUtil.get_qr("\n".join([x for x in mes if (type(x) == str)])))))
+						await Putil.reply(get_cards, event, "消息被风控发送失败了！😭\n以下是纯文字结果：" + MessageSegment.image(ImageUtil.text_to_image("\n".join([x for x in mes if (type(x) == str)]))))
 			else:
 				await Putil.reply(get_cards, event, f"需要{times * cost}🦌币！")
 		else:
@@ -214,7 +218,56 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 	else:
 		await Putil.reply(get_cards, event, "卡池不存在！")
 
-def get_card(pool, count):
+@daily_bro.handle()
+async def _(bot: Bot, event: Event):
+	await Putil.processing(bot, event)
+	data = DataFile(f"[data]/user/{event.user_id}/card")
+	time = datetime.datetime.now()
+	last_time = datetime.datetime.strptime(data.get("daily.json", "last_time", (time - datetime.timedelta(days = 1)).strftime("%Y-%m-%d")), "%Y-%m-%d")
+	bro = data.get("daily.json", "name", "")
+	level = pick_level("_每日群友__", bro)
+	if (time >= (last_time + datetime.timedelta(days = 1))):
+		card = get_card("_每日群友_", 1)[0]
+		item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
+		item.add(card[0], 1, card[1])
+		bro = card[0]
+		level = card[1]["level"]
+		data.set("daily.json", "name", card[0])
+		data.set("daily.json", "last_time", time.strftime("%Y-%m-%d"))
+	mes = [LINE, f"🌸你今天的每日群友是：{bro.split(" - ")[0]}！🌸"]
+	if (time >= (last_time + datetime.timedelta(days = 1))):
+		mes.extend([f"✅『{level}』级卡牌：{bro}", "已收录至【我的卡牌】"])
+	await Putil.sending(bot, event)
+	await Putil.reply(daily_bro, event, MessageSegment.image(get_card_image(bro, add_border = False)) + "\n".join(mes))
+
+def get_card(pool_name, count):
+	cards = get_card_name(pool_name, count)
+	cdata = DataFile("[data]/DATA/card")
+	pool_data = cdata.get("cards.json", pool_name, {})
+	result = []
+	for card_name in cards:
+		#卡牌信息（附带的文字）
+		text = ""
+		text_data = cdata.get("cards.json", pool_name, {}).get("card_text", {})
+		text = text_data.get("general", text)
+		if (text_data.get("specific", None) != None):
+			for card_text, involved_cards in text_data.get("specific", None):
+				if (card_name in involved_cards):
+					text = card_text
+		#重定向卡池
+		real_pool = pool_name
+		reindex_pool = pool_data.get("reindex_pool", None)
+		if (reindex_pool != None):
+			if (reindex_pool.get("general", None) != None):
+				real_pool = reindex_pool.get("general", None)
+			for re_pool, re_cards in reindex_pool.items():
+				if (type(re_cards) == list and card_name in re_cards):
+					real_pool = re_pool
+
+		result.append((card_name, {"level": pick_level(pool_name, card_name), "pool": real_pool, "text": text}))
+	return result
+
+def get_card_name(pool, count):
 	data = DataFile("[data]/DATA/card")
 	pool =  data.get("cards.json", pool, {})
 	all_card = [pool.get(x) for x in LEVELS if (pool.get(x, None) != None)]
@@ -227,9 +280,9 @@ def get_card(pool, count):
 	return result
 
 def pick_level(pool_name, name):
-	all_card = DataFile("[data]/DATA/card").get("cards.json", pool_name, {})
+	pool_data = DataFile("[data]/DATA/card").get("cards.json", pool_name, {})
 	for level in LEVELS:
-		if (name in all_card.get(level, [])):
+		if (name in pool_data.get(level, [])):
 			return level
 	return None
 
@@ -259,10 +312,13 @@ def get_avaliable_pools():
 			result.append(pool_name)
 	return result
 
-def get_card_image(name, level, in_bytes = True):
+def get_card_image(name, level = "C", in_bytes = True, add_border = True):
 	data = DataFile("[data]/DATA/card/src")
-	card_img = Image.open(data.get_path(f"{name}.png"))
-	border_img = Image.open(data.get_path(f"card_border/{level}.png"))
-	mask_img = Image.open(data.get_path(f"card_border/{level}_mask.png"))
-	border_img.paste(card_img, (0,0), mask_img.convert('RGBA').split()[3])
+	if (add_border):
+		card_img = Image.open(data.get_path(f"{name}.png")).resize((1248, 1872))
+		border_img = Image.open(data.get_path(f"card_border/{level}.png"))
+		mask_img = Image.open(data.get_path(f"card_border/{level}_mask.png"))
+		border_img.paste(card_img, (0,0), mask_img.convert('RGBA').split()[3])
+	else:
+		border_img = Image.open(data.get_path(f"{name}.png")).resize((1248, 1872))
 	return ImageUtil.img_to_bytesio(border_img, "PNG") if (in_bytes) else border_img

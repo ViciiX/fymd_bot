@@ -17,6 +17,7 @@ from nonebot.adapters.onebot.v11.event import GroupMessageEvent
 from ..utils.file import DataFile
 from ..utils import util as Util
 from ..utils import plugin_util as Putil
+from ..utils import image_util as ImageUtil
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
 plt.rcParams['axes.unicode_minus'] = False
@@ -47,6 +48,7 @@ subscribe_impart = on_regex("^订阅音趴$|^订阅一起听$")
 unsubscribe_impart = on_regex("^取消订阅音趴$|^取消订阅一起听$")
 topcoin = on_fullmatch("鹿币排行榜")
 present = on_regex("^兑换码 (.+)$")
+t2i = on_regex("^文字转图片\n([\\s\\S]+)")
 
 test = on_fullmatch("#test", permission = SUPERUSER)
 sendsrc = on_fullmatch("#src", permission = SUPERUSER)
@@ -445,11 +447,10 @@ async def _(event: Event):
 async def _(bot: Bot, event: Event):
 	if (event.message[0].type == "json" and isinstance(event, GroupMessageEvent)):
 		data = json.loads(event.message[0].data["data"]).get("meta", {}).get("news", {})
-		if (data.get("tag", "") == "网易云音乐" and data.get("title", "") == "大家围坐听歌，就等你啦！"):
-			data = DataFile("[data]/group")
-			users = data.get(event.group_id, "impart_users", [])
+		if (data.get("tag", "") == "网易云音乐" and data.get("title", "") in ["大家围坐听歌，就等你啦！", "艺人乐迷邀你一起听"]):
+			users = DataFile("[data]/group").get(event.group_id, "impart_users", [])
 			if (len(users) != 0):
-				await impart_receive.send(Message([MessageSegment.at(qq) for qq in users]+[MessageSegment.text("\n音趴dd!")]))
+				await impart_receive.send(Message([MessageSegment.at(qq) for qq in users]+[MessageSegment.text("\n✅检测到音趴"), MessageSegment.text(f"\n跳转链接：{data["jumpUrl"]}")]))
 
 @topcoin.handle()
 async def _(bot: Bot, event: Event):
@@ -552,6 +553,10 @@ async def _(bot: Bot, event: Event):
 		await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd直链获取工具"]}, [("bot", mes)])
 	else:
 		await Putil.reply(get_link, event, "请回复包含想要获取直链的资源的消息！")
+
+@t2i.handle()
+async def _(args = RegexGroup()):
+	await t2i.finish(MessageSegment.image(ImageUtil.text_to_image(args[0])))
 
 
 def get_year_calendar(year):
