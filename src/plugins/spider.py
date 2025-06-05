@@ -17,6 +17,7 @@ from nonebot.params import RegexGroup
 from ..utils.file import DataFile
 from ..utils import util as Util
 from ..utils import plugin_util as Putil
+from ..utils import image_util as ImageUtil
 
 headers = {
     "accept-language": "zh-CN,zh;q=0.9",
@@ -281,21 +282,10 @@ async def get_nsfw_img(is_today = False):
 								result["image"] = img_result["img"]
 			return result
 
-def img_process(img_bytes):
-	try:
-		img = Image.open(BytesIO(img_bytes))
-		img = img.convert("RGBA").crop((0, 0, img.size[0]+random.randint(-10, 10), img.size[1]+random.randint(-10, 10))).filter(ImageFilter.UnsharpMask(random.randint(1,5)/10, random.randint(50, 150)))
-		i = BytesIO()
-		img.save(i, format = "PNG")
-		return i
-	except Exception as e:
-		print(e)
-		return img_bytes
-
 async def get_img(url, headers = None, is_proc = True, timeout = 20, proxy = proxy):
 	result = await get_bytes(url, headers, timeout, proxy)
 	if (is_proc):
-		result["bytes"] = img_process(result["bytes"]).getvalue()
+		result["bytes"] = ImageUtil.img_process(result["bytes"]).getvalue()
 	result["img"] = result.pop("bytes")
 
 	#for test

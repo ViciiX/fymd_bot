@@ -5,10 +5,12 @@ from nonebot.adapters.onebot.v11.message import Message, MessageSegment
 from nonebot.adapters.onebot.v11.event import GroupMessageEvent
 from nonebot import on_fullmatch, on_message, on_regex
 from nonebot.params import RegexGroup
+from PIL import Image
 
 from ..utils.file import DataFile, Item
 from ..utils import util as Util
 from ..utils import plugin_util as Putil
+from ..utils import image_util as ImageUtil
 
 detect_pool_avaliable = on_message(block = False)
 forhelp = on_regex("^卡牌帮助 (\\d+)$|^卡牌帮助$")
@@ -140,10 +142,6 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 	if (0 <= index and index < len(item.items)):
 		await Putil.processing(bot, event)
 		current_item = item.items[index]
-		path = os.path.join(DataFile("[data]/DATA/card/src").path, f"{current_item["name"]}.png")
-		byte = None
-		with open(path, "rb") as f:
-			byte = Util.img_process(f.read())
 		mes = [LINE] + f"""{current_item["name"]}
 卡池：『{current_item.get("data", {}).get("pool", "?")}』
 等级： 『{current_item.get("data", {}).get("level", "?")}』
@@ -164,7 +162,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 		if (text != ""):
 			mes.append(text)
 		await Putil.sending(bot, event)
-		await Putil.reply(check, event, MessageSegment.image(byte) + "\n".join(mes))
+		await Putil.reply(check, event, MessageSegment.image(get_card_image(current_item["name"], current_item.get("data", {}).get("level", "C"))) + "\n".join(mes))
 	else:
 		await Putil.reply(check, event, "未找到该卡牌id！")
 
@@ -191,7 +189,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 					level_count[level] = level_count.get(level, 0) + 1
 					item_data = {"level": level, "pool": pool_name, "text": cdata.get("cards.json", pool_name, {}).get("card_hint", "")}
 					item.add(card, 1, item_data, False)
-					mes.append(MessageSegment.image(Util.thumbnail(os.path.join(cdata.path, f"src/{card}.png"), (100, 150))))
+					mes.append(MessageSegment.image(ImageUtil.thumbnail(get_card_image(card, level, False), (100, 150))))
 					mes.append({"S": "✨Nice！✨\n", "SSS": "🎉Ohhhhhh！🎉\n", "SSR": "🎊👑这、这是？！👑🎊\n"}.get(level, "") + f"恭喜你抽到了『{level}』级卡牌：\n{card}！" + {"S": "\nGood Luck！", "SSS": "\n欧皇！", "SSR": "\n哇！金色传说！！"}.get(level, ""))
 				item.save()
 				total_mes = ["🎉本次抽卡获得🎉"]
@@ -203,7 +201,12 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 				try:
 					await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", mes)])
 				except Exception as e:
-					await Putil.reply(get_cards, event, f"消息被风控发送失败了！😭\n但是卡牌已到账，没有消失✅")
+					print(f"发送带图片卡牌结果错误：{e}")
+					try:
+						await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", ["(图片发送失败)"]+[x for x in mes if (type(x) == str)])])
+					except Exception as e:
+						print(f"发送纯文字卡牌结果错误：{e}")
+						await Putil.reply(get_cards, event, "消息被风控发送失败了！😭\n可以扫描二维码查看结果：" + MessageSegment.image(ImageUtil.img_to_bytesio(ImageUtil.get_qr("\n".join([x for x in mes if (type(x) == str)])))))
 			else:
 				await Putil.reply(get_cards, event, f"需要{times * cost}🦌币！")
 		else:
@@ -255,3 +258,11 @@ def get_avaliable_pools():
 		if (values.get("avaliable", True) == True):
 			result.append(pool_name)
 	return result
+
+def get_card_image(name, level, in_bytes = True):
+	data = DataFile("[data]/DATA/card/src")
+	card_img = Image.open(data.get_path(f"{name}.png"))
+	border_img = Image.open(data.get_path(f"card_border/{level}.png"))
+	mask_img = Image.open(data.get_path(f"card_border/{level}_mask.png"))
+	border_img.paste(card_img, (0,0), mask_img.convert('RGBA').split()[3])
+	return ImageUtil.img_to_bytesio(border_img, "PNG") if (in_bytes) else border_img
