@@ -16,10 +16,14 @@ detect_pool_avaliable = on_message(block = False)
 forhelp = on_regex("^卡牌帮助 (\\d+)$|^卡牌帮助$")
 my_card = on_fullmatch("我的卡牌")
 my_level_card = on_regex("^我的卡牌 (C|B|A|S|SSS|SSR|c|b|a|s|sss|ssr)$")
+my_all_card = on_regex("^我的全部卡牌$|^我的所有卡牌$|^查看所有卡牌$")
 card_pools = on_regex("^卡池 (\\d+)$|^卡池$")
 get_cards = on_regex("^抽卡 (\\d+) (\\d+)$")
 check = on_regex("^查看卡牌 (\\d+)$")
 daily_bro = on_fullmatch("每日群友")
+
+shop = on_fullmatch("卡牌市场")
+sell = on_regex("^回收卡牌 (.+) (.+)$")
 
 LINE = "——————————"
 LEVELS = ['SSR', 'SSS', 'S', 'A', 'B', 'C']
@@ -125,7 +129,8 @@ async def _(event: Event):
 	for level, count in cards.items():
 		mes.append(f"{level}级卡片： {count}张")
 	mes.append(LINE)
-	mes.append("发送“我的卡牌 【等级】”查看详细信息")
+	mes.append("发送“我的卡牌 【等级】”查看对应等级的卡牌")
+	mes.append("发送“我的全部卡牌”查看所有卡牌")
 	await Putil.reply(my_card, event, "\n".join(mes))
 
 @my_level_card.handle()
@@ -137,6 +142,20 @@ async def _(event: Event, args = RegexGroup()):
 	mes.append("卡牌前数字为背包内卡牌id")
 	mes.append("发送“查看卡牌 【卡牌id】”查看卡牌信息")
 	await Putil.reply(my_level_card, event, "\n".join(mes))
+
+@my_all_card.handle()
+async def _(bot: Bot, event: Event):
+	await Putil.processing(bot, event)
+	item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
+	mes = [f"{event.sender.nickname} 的全部卡牌：\n"]
+	for level in LEVELS:
+		s = Item.format([x for x in item.items if (x.get("data", {}).get("level", None) == level)], "[call:get_id].【[data:level]】[name] * [amount]", callables = {"get_id": [get_id, {"items": item.items}]})
+		mes.extend([LINE, f"『{level}』级卡牌：", s])
+	mes.append(LINE)
+	mes.append("卡牌前数字为背包内卡牌id")
+	mes.append("发送“查看卡牌 【卡牌id】”查看卡牌信息")
+	await Putil.sending(bot, event)
+	await Putil.reply(my_all_card, event, MessageSegment.image(ImageUtil.text_to_image("\n".join(mes))))
 
 @check.handle()
 async def _(bot: Bot, event: Event, args = RegexGroup()):
@@ -150,7 +169,8 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 卡池：『{current_item.get("data", {}).get("pool", "?")}』
 等级： 『{current_item.get("data", {}).get("level", "?")}』
 拥有者：{event.sender.nickname}
-拥有数量：{current_item.get("amount", "?")}""".split("\n")
+拥有数量：{current_item.get("amount", "?")}
+回收单价：{get_price(current_item)} 🦌币""".split("\n")
 		mes.append(LINE)
 
 		data = DataFile("[data]")
@@ -158,10 +178,13 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 		analysis = [x["values"]["items"] for x in analysis if (x["values"] != {"items": []})]
 		all_user = len(analysis)
 		count = 0
+		amount_count = 0
 		for user_items in analysis:
-			if (Item.value_find(user_items, current_item["name"], current_item["data"] if (current_item["data"] != {}) else None)[1] != None):
+			target_item = Item.value_find(user_items, current_item["name"], current_item["data"] if (current_item["data"] != {}) else None)[1]
+			if (target_item != None):
 				count += 1
-		mes.extend([f"全服拥有人数：{count}/{all_user}【{round(count / all_user * 100, 5)}%】", LINE])
+				amount_count += target_item["amount"]
+		mes.extend([f"全服拥有人数：{count}/{all_user}【{round(count / all_user * 100, 3)}%】", f"全服拥有数量：{amount_count}", f"你掌握全服【{round(current_item["amount"] / amount_count * 100, 1)}%】的【{current_item["name"]}】！", LINE])
 		text = current_item.get("data", {}).get("text", "")
 		if (text != ""):
 			mes.append(text)
@@ -239,6 +262,69 @@ async def _(bot: Bot, event: Event):
 		mes.extend([f"✅『{level}』级卡牌：{bro}", "已收录至【我的卡牌】"])
 	await Putil.sending(bot, event)
 	await Putil.reply(daily_bro, event, MessageSegment.image(get_card_image(bro, add_border = False)) + "\n".join(mes))
+
+@shop.handle()
+async def _():
+	data = DataFile("[data]")
+	goods = data.get("shop.json", "goods", [])
+	mes = ["🏬卡牌市场🏬", LINE, "✈最近上市："]
+	if (len(goods) == 0):
+		mes.append("无")
+	for item in goods[:-6]:
+		mes.append(f"{item["name"]} * {item["amount"]} - {item["cost"]}🦌币")
+	mes.extend([LINE, "发送“回收卡牌 [卡牌id] [数量]”可以低价但不限量不限时地出售现有的卡牌"])
+	await shop.finish("\n".join(mes))
+
+@sell.handle()
+async def _(event: Event, args = RegexGroup()):
+	data = DataFile("[data]/DATA/card")
+	args = [int(x) for x in args]
+	user_item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
+	index = args[0]
+	if (0 <= index and index < len(user_item.items)):
+		item = user_item.items[index]
+		if (item["amount"] >= args[1]):
+			unit_price = get_price(item)
+			price = round(unit_price * args[1])
+			if (price >= 1):
+				item_data = Item(f"[data]/user/{event.user_id}/card/mycard.json")
+				user_data = DataFile(f"[data]/user/{event.user_id}")
+				print(item_data.reduce(item["name"], args[1], item["data"]))
+				user_data.add_num("profile", "coin", price)
+				await Putil.reply(sell, event, f"""
+💰回收成功！💰
+卡牌：{item["name"]}
+数量：{args[1]}
+单价：{round(unit_price, 2)} 🦌币/张
+总额：{price} 🦌币
+""".strip())
+			else:
+				await Putil.reply(sell, event, "金额不足1🦌币！请提高出售数量")
+		else:
+			await Putil.reply(sell, event, "你没有这么多卡牌！")
+	else:
+		await Putil.reply(sell, event, "未找到该卡牌id！")
+
+def get_price(item):
+	pool_data = DataFile("[data]/DATA/card").get("cards.json", item["data"]["pool"], {})
+	basic_price = pool_data.get("cost", 1) * 0.2 * pool_data.get("sell_revision", 1)
+	weight = pool_data.get("weight")
+	ratio = sum([weight.get(level, 0) for level in LEVELS]) / weight[item["data"]["level"]]
+	return basic_price * ratio
+
+def get_item_info(item):
+	data = DataFile("[data]")
+	analysis = data.get_multi_files("user", "[read]/card/mycard.json", {"items": []})
+	analysis = [x["values"]["items"] for x in analysis if (x["values"] != {"items": []})]
+	count = 0
+	amount_count = 0
+	for user_items in analysis:
+		target_item = Item.value_find(user_items, item["name"], item["data"] if (item["data"] != {}) else None)[1]
+		if (target_item != None):
+			count += 1
+			amount_count += target_item["amount"]
+	return {"owner": [count, len(analysis)], "total_amount": [item["amount"], amount_count]}
+
 
 def get_card(pool_name, count):
 	cards = get_card_name(pool_name, count)

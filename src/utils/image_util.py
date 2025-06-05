@@ -30,7 +30,7 @@ def get_qr(text, fill_color = "black", back_color = "white"):
 	qr.make(fit=True)
 	return qr.make_image(fill_color = fill_color, back_color = back_color)
 
-def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "Noto", font_size = 32, font_color = "black", margin = 20, min_size = (256, 256), in_bytes = True):
+def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "Noto", font_size = 32, font_color = "black", margin = 100, min_size = (256, 256), in_bytes = True):
 	texts = []
 	d = DataFile("[data]/DATA/font")
 	raw_texts = [raw_texts] if (type(raw_texts) == str) else raw_texts
@@ -58,7 +58,7 @@ def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "
 		texts = new_texts
 
 	width = max(min_size[0], width + margin * 2)
-	height = max(min_size[1], margin * 2 + sum([font.getbbox(text)[3] for text in texts]))
+	height = max(min_size[1], margin * 2 + sum([max(font.getbbox("汉字")[3], font.getbbox(text)[3]) for text in texts]))
 	
 	with Image.new(mode = "RGBA", size = (width, height), color = bg_color) as img:
 		with Pilmoji(img) as draw:

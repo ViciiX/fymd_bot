@@ -37,14 +37,13 @@ async def main_loop():
 
 async def summon_code():
 	dtime = datetime.datetime.now()
-	next_time = get_normal_random(20, 210, 1, 0)[0] * 60
+	next_time = get_normal_random(10, 200, 1, 0)[0] * 60
 
 	avr_coin = next_time/60
 	coin = int(get_normal_random(avr_coin/2, avr_coin*2, 1)[0])
 	user = random.randint(1, 4)
 	time = random.randint(10, 30)
 	deadline = (dtime + datetime.timedelta(minutes = time)).strftime("%Y-%m-%d %H:%M:%S")
-	dtime += datetime.timedelta(minutes = time)
 	code = "".join([code_chars[random.randint(0, 35)] for x in range(16)])
 	add_code(code, round(coin / user), deadline, user, "✨活跃奖励✨", True)
 	mes = ["🎁神秘兑换码出现❗", f"⏰限时时间：{time}分钟内！", f"😸数量：{user}", f"🎇兑换码：{code}"]

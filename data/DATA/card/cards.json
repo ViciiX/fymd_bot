@@ -51,9 +51,9 @@
 		"SSS": ["牛魔 - 娘化", "fading light - 娘化", "Trance魔柠 - 露营", "肉乐 - 黑胶", "色祖师 - 冒险家", "FYMD - 哎哟卧槽", "肉乐 - 你爸一边哭一边", "WidNac - 沙滩"],
 		"SSR": ["牛魔 - 横刀立马", "肉乐 - 娘化", "张先生 - 宇航员", "鹿关仙人 - 天尊", "Choose Life", "牛魔 - 这么强？！", "haibao - 学长", "Campaign", "fading light - 飞ing light", "牛魔 - 喔"],
 		"weight": {
-			"C": 40,
-			"S": 38,
-			"SSS": 15,
+			"C": 30,
+			"S": 45,
+			"SSS": 18,
 			"SSR": 7
 		},
 		"cost": 40,

@@ -259,17 +259,22 @@ class Item:
 		for i in add_items:
 			self.add(i["name"], i["amount"], i.get("data", None), is_save)
 
-	def remove(self, tname, amount, tdata = None):
-		item = self.find(tname, tdata)
+	def reduce(self, name, amount, data = None):
+		item = self.find(name, data)
+		state = "Done"
 		if (item[0] == -1):
-			return False
+			state = "404"
 		else:
-			if (self.items[item[0]]["amount"] >= amount):
+			if (self.items[item[0]]["amount"] > amount):
 				self.items[item[0]]["amount"] -= amount
-				return True
+				state = "Done"
+			elif (self.items[item[0]]["amount"] == amount):
+				del self.items[item[0]]
+				state = "Remove"
 			else:
-				return False
+				state = "Not"
 		self.save()
+		return state
 
 	def format_items(template, limit = -1, callables = {}):
 		return Item.format(self.items, template, limit)

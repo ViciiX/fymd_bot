@@ -50,6 +50,7 @@ topcoin = on_fullmatch("鹿币排行榜")
 present = on_regex("^兑换码 (.+)$")
 t2i = on_regex("^文字转图片\n([\\s\\S]+)")
 
+
 test = on_fullmatch("#test", permission = SUPERUSER)
 sendsrc = on_fullmatch("#src", permission = SUPERUSER)
 advice_list = on_fullmatch("#adv", permission = SUPERUSER)
@@ -114,7 +115,7 @@ async def _():
 
 @add_present.handle()
 async def _(args = RegexGroup()):
-	code = {"amount": int(args[1]), "deadline": args[2] if (args[2] not in ["None", "/", " "]) else None, "count": int(args[3]), "text": args[4]}
+	code = {"amount": int(args[1]), "deadline": args[2] if (args[2] not in ["None", "/", " "]) else None, "count": int(args[3]) if (args[3] not in ["None", "/", " "]) else None, "text": args[4]}
 	DataFile(f"[data]").set("gift_code.json", args[0], code)
 	await add_present.finish(f"添加成功：{args[0]}")
 
@@ -132,7 +133,7 @@ async def _(bot: Bot, event: Event):
 			with open(file_path, "r", encoding = "utf-8") as f:
 				lines += len(f.readlines())
 		mes = f"""[𝕱𝖚𝖈𝖐 𝖄𝖔𝖚 𝕸𝖊𝖑𝖔𝖉𝖎𝖈 𝕯𝖚𝖇𝖘𝖙𝖊𝖕]
-专属机器人 unOFFICIAL
+专属机器人 OFFICIAL
 发送“帮助”获取所有功能
 ————————————
 ✅已连续运行{Util.format_delta_time(dtime - start_time)}！
