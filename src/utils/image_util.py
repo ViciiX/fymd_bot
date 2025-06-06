@@ -30,7 +30,15 @@ def get_qr(text, fill_color = "black", back_color = "white"):
 	qr.make(fit=True)
 	return qr.make_image(fill_color = fill_color, back_color = back_color)
 
-def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "Noto", font_size = 32, font_color = "black", margin = 100, min_size = (256, 256), in_bytes = True):
+def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "Noto", font_size = 32, font_color = "black", margin = 100, min_size = (256, 256), in_bytes = True, qq = None):
+	
+	#自定义字体、背景配置
+	if (qq != None):
+		user_data = DataFile(f"[data]/user/{qq}").get("settings.json", "text_to_image", {})
+		bg_color = user_data.get("bg_color", bg_color)
+		font_name = user_data.get("font_name", font_name)
+		font_color = user_data.get("font_color", font_color)
+
 	texts = []
 	d = DataFile("[data]/DATA/font")
 	raw_texts = [raw_texts] if (type(raw_texts) == str) else raw_texts
@@ -64,3 +72,10 @@ def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "
 		with Pilmoji(img) as draw:
 			draw.text(xy = (margin, margin), text = "\n".join(texts), fill = font_color, font = font, emoji_scale_factor = 0.9)
 			return img_to_bytesio(img) if (in_bytes) else img
+
+def get_color_avaliable(color):
+	try:
+		Image.new(mode = "RGBA", size = (1,1), color = color)
+		return True
+	except Exception as e:
+		return False

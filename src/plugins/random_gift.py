@@ -37,7 +37,7 @@ async def main_loop():
 
 async def summon_code():
 	dtime = datetime.datetime.now()
-	next_time = get_normal_random(10, 200, 1, 0)[0] * 60
+	next_time = get_normal_random(10, 180, 1, 0)[0] * 60
 
 	avr_coin = next_time/60
 	coin = int(get_normal_random(avr_coin/2, avr_coin*2, 1)[0])

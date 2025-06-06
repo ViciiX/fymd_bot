@@ -32,7 +32,6 @@ impart_receive = on_message(priority = 2, block = True)
 detect_present_avaliable = on_message(block = False)
 
 fymd = on_regex("^方悦名都$|^FYMD$")
-forhelp = on_regex("^帮助 (\\d+)$|^帮助$")
 
 get_link = on_fullmatch("直链", rule = to_me())
 sign = on_fullmatch("签到")
@@ -49,6 +48,8 @@ unsubscribe_impart = on_regex("^取消订阅音趴$|^取消订阅一起听$")
 topcoin = on_fullmatch("鹿币排行榜")
 present = on_regex("^兑换码 (.+)$")
 t2i = on_regex("^文字转图片\n([\\s\\S]+)")
+
+set_t2i = on_regex("^文转图设置 (背景颜色|字体|字体颜色)[：|:| ](.+)$|文转图设置")
 
 
 test = on_fullmatch("#test", permission = SUPERUSER)
@@ -144,36 +145,6 @@ async def _(bot: Bot, event: Event):
 https://github.com/ViciiX/fymd_bot
 🌟欢迎Star！"""
 		await Putil.reply(atme, event, mes)
-
-@forhelp.handle()
-async def _(event: Event, args = RegexGroup()):
-	if (args[0] == None):
-		data = DataFile("[data]/DATA")
-		help_dict = data.get("help.json", "main", {})
-		text = f"""功能列表
-————————————
-{"\n".join([f"{i}.{list(help_dict.keys())[i]}" for i in range(len(help_dict.keys()))])}
-————————————
-发送“帮助 [序号]”获取详细帮助
-如：帮助 2
-————————————"""
-		mes = Message.template("""{}
-对于某些功能：
-回应{}时表示正在获取/处理
-回应{}时表示正在发送信息
-""").format(text, MessageSegment.face(424), MessageSegment.face(124))
-		await forhelp.finish(mes)
-	else:
-		data = DataFile("[data]/DATA")
-		help_dict = data.get("help.json", "main", {})
-		help_list = list(help_dict.keys())
-		index = int(args[0])
-		if (0 <= index and index <= len(help_list)-1):
-			await Putil.reply(forhelp, event, f"""{help_list[index]}
-————————————
-{"\n".join(help_dict[help_list[index]])}""")
-		else:
-			await Putil.reply(forhelp, event, "404 Not Fucked")
 
 @fymd.handle()
 async def _(event: Event):
@@ -556,8 +527,34 @@ async def _(bot: Bot, event: Event):
 		await Putil.reply(get_link, event, "请回复包含想要获取直链的资源的消息！")
 
 @t2i.handle()
-async def _(args = RegexGroup()):
-	await t2i.finish(MessageSegment.image(ImageUtil.text_to_image(args[0])))
+async def _(event: Event, args = RegexGroup()):
+	await t2i.finish(MessageSegment.image(ImageUtil.text_to_image(args[0], qq = event.user_id)))
+
+@set_t2i.handle()
+async def _(event: Event, args = RegexGroup()):
+	if (args[0] == None):
+		mes = ["文字转图片设置", LINE, \
+		"可用选项：", "背景颜色 / 字体颜色 / 字体", LINE, \
+		"字体支持(区分大小写)：", \
+		"Noto：Noto Sans", "OPPO：OPPO字体", "Pixel：Fusion Pixel像素字体", "Zhengdao：庞门正道标题体", "Zhanku：站酷高端黑", LINE, \
+		"发送“文转图设置 【选项】 【选项值】”进行设置", LINE, \
+		"示例：", "文转图设置 背景颜色 black", "文转图设置 字体颜色 lightgreen", "文转图设置 字体 Pixel"]
+		await Putil.reply(set_t2i, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)) + "字体颜色支持hex(#xxxxxx), rgb(rgb(xx,xx,xx))等格式\n详见：https://pillow.readthedocs.io/en/stable/reference/ImageColor.html#color-names")
+	else:
+		data = DataFile(f"[data]/user/{event.user_id}")
+		settings = data.get("settings.json", "text_to_image", {})
+		if (args[0] == "字体"):
+			if (args[1] in ["Pixel", "Noto", "OPPO", "Zhengdao", "Zhanku"]):
+				settings["font_name"] = args[1]
+			else:
+				await Putil.reply(set_t2i, event, "字体不存在！", True)
+		else:
+			if (ImageUtil.get_color_avaliable(args[1])):
+				settings["font_color" if (args[0] == "字体颜色") else "bg_color"] = args[1]
+			else:
+				await Putil.reply(set_t2i, event, "颜色格式无效！", True)
+		data.set("settings.json", "text_to_image", settings)
+		await Putil.reply(set_t2i, event, "设置成功！" + MessageSegment.image(ImageUtil.text_to_image(["你好，世界！", "Hello, world!", "这是一些emoji: 🦌🦌🦌🦌🦌🦌🦌", "", "测试test1234567890"], width = None, qq = event.user_id)))
 
 
 def get_year_calendar(year):

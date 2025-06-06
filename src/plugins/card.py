@@ -1,4 +1,4 @@
-import random, os, datetime
+import random, os, datetime, math
 
 from nonebot.adapters.onebot.v11 import Bot, Event
 from nonebot.adapters.onebot.v11.message import Message, MessageSegment
@@ -13,7 +13,6 @@ from ..utils import plugin_util as Putil
 from ..utils import image_util as ImageUtil
 
 detect_pool_avaliable = on_message(block = False)
-forhelp = on_regex("^卡牌帮助 (\\d+)$|^卡牌帮助$")
 my_card = on_fullmatch("我的卡牌")
 my_level_card = on_regex("^我的卡牌 (C|B|A|S|SSS|SSR|c|b|a|s|sss|ssr)$")
 my_all_card = on_regex("^我的全部卡牌$|^我的所有卡牌$|^查看所有卡牌$")
@@ -23,7 +22,8 @@ check = on_regex("^查看卡牌 (\\d+)$")
 daily_bro = on_fullmatch("每日群友")
 
 shop = on_fullmatch("卡牌市场")
-sell = on_regex("^回收卡牌 (.+) (.+)$")
+sell = on_regex("^回收卡牌 (\\d+) (\\d+)$")
+launch = on_regex("^上架 (\\d+) (\\d+)\n价格[：|:| ](\\d+)(\n介绍[：|:| ](.+))?$")
 
 LINE = "——————————"
 LEVELS = ['SSR', 'SSS', 'S', 'A', 'B', 'C']
@@ -42,31 +42,6 @@ async def _():
 				pool_data["avaliable"] = False
 				data.set("cards.json", pool_name, pool_data)
 				print(f"卡池{pool_name}超时，已禁用")
-
-@forhelp.handle()
-async def _(event: Event, args = RegexGroup()):
-	if (args[0] == None):
-		data = DataFile("[data]/DATA")
-		help_dict = data.get("help.json", "card", {})
-		mes = f"""【卡牌】功能列表
-————————————
-{"\n".join([f"{i}.{list(help_dict.keys())[i]}" for i in range(len(help_dict.keys()))])}
-————————————
-发送“卡牌帮助 [序号]”获取详细帮助
-如：卡牌帮助 1
-————————————"""
-		await forhelp.finish(mes)
-	else:
-		data = DataFile("[data]/DATA")
-		help_dict = data.get("help.json", "card", {})
-		help_list = list(help_dict.keys())
-		index = int(args[0])
-		if (0 <= index and index <= len(help_list)-1):
-			await Putil.reply(forhelp, event, f"""{help_list[index]}
-————————————
-{"\n".join(help_dict[help_list[index]])}""")
-		else:
-			await Putil.reply(forhelp, event, "404 Not Fucked")
 
 @card_pools.handle()
 async def _(bot: Bot, event: Event, args = RegexGroup()):
@@ -111,7 +86,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 			try:
 				await Putil.send_forward_msg(bot, event, {"bot": (Putil.bot_id, "FyMd卡池")}, [("bot", msg)])
 			except Exception as e:
-				await card_pools.finish(MessageSegment.image(ImageUtil.text_to_image("\n\n".join(msg), width = None)))
+				await card_pools.finish(MessageSegment.image(ImageUtil.text_to_image("\n\n".join(msg), width = None, qq = event.user_id)))
 		else:
 			await card_pools.finish("卡池不存在！")
 
@@ -155,7 +130,7 @@ async def _(bot: Bot, event: Event):
 	mes.append("卡牌前数字为背包内卡牌id")
 	mes.append("发送“查看卡牌 【卡牌id】”查看卡牌信息")
 	await Putil.sending(bot, event)
-	await Putil.reply(my_all_card, event, MessageSegment.image(ImageUtil.text_to_image("\n".join(mes))))
+	await Putil.reply(my_all_card, event, MessageSegment.image(ImageUtil.text_to_image("\n".join(mes), qq = event.user_id)))
 
 @check.handle()
 async def _(bot: Bot, event: Event, args = RegexGroup()):
@@ -233,7 +208,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 						await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", ["(图片发送失败)"]+[x for x in mes if (type(x) == str)])])
 					except Exception as e:
 						print(f"发送纯文字卡牌结果错误：{e}")
-						await Putil.reply(get_cards, event, "消息被风控发送失败了！😭\n以下是纯文字结果：" + MessageSegment.image(ImageUtil.text_to_image("\n".join([x for x in mes if (type(x) == str)]))))
+						await Putil.reply(get_cards, event, "消息被风控发送失败了！😭\n以下是纯文字结果：" + MessageSegment.image(ImageUtil.text_to_image("\n".join([x for x in mes if (type(x) == str)]), qq = event.user_id)))
 			else:
 				await Putil.reply(get_cards, event, f"需要{times * cost}🦌币！")
 		else:
@@ -285,7 +260,7 @@ async def _(event: Event, args = RegexGroup()):
 		item = user_item.items[index]
 		if (item["amount"] >= args[1]):
 			unit_price = get_price(item)
-			price = round(unit_price * args[1])
+			price = math.floor(unit_price * args[1])
 			if (price >= 1):
 				item_data = Item(f"[data]/user/{event.user_id}/card/mycard.json")
 				user_data = DataFile(f"[data]/user/{event.user_id}")
@@ -305,9 +280,13 @@ async def _(event: Event, args = RegexGroup()):
 	else:
 		await Putil.reply(sell, event, "未找到该卡牌id！")
 
+@launch.handle()
+async def _(event: Event, args = RegexGroup()):
+	print(args)
+
 def get_price(item):
 	pool_data = DataFile("[data]/DATA/card").get("cards.json", item["data"]["pool"], {})
-	basic_price = pool_data.get("cost", 1) * 0.2 * pool_data.get("sell_revision", 1)
+	basic_price = pool_data.get("cost", 1) * 0.1 * pool_data.get("sell_revision", 1)
 	weight = pool_data.get("weight")
 	ratio = sum([weight.get(level, 0) for level in LEVELS]) / weight[item["data"]["level"]]
 	return basic_price * ratio
