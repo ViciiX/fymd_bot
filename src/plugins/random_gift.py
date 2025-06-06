@@ -3,7 +3,7 @@ import numpy as np
 
 from nonebot.adapters.onebot.v11 import Bot, Event
 from nonebot.adapters.onebot.v11.message import Message, MessageSegment
-from nonebot import require, on_fullmatch, get_bots
+from nonebot import require, on_fullmatch, get_bot
 from ..utils.file import DataFile
 from ..utils import util as Util
 from nonebot.permission import SUPERUSER
@@ -64,12 +64,13 @@ def add_code(name, amount, deadline, count, text, temp):
 
 def get_fymd_bot():
 	global bot
-	bots = get_bots()
-	if (bots != {}):
-		print("I got bot")
-		bot = bots[str(bot_id)]
+	try:
+		bot = get_bot()
+		print("random_gift.py --> I got bot")
 		scheduler.add_job(main_loop, "interval", seconds = 5)
-		scheduler.remove_job("get_bot")
+		scheduler.remove_job("rg_get_bot")
+	except Exception:
+		pass
 
 def get_normal_random(_min, _max, count = 1, round_num = 0, scale = 0.25):
 	mean = (_min + _max) / 2
@@ -78,4 +79,4 @@ def get_normal_random(_min, _max, count = 1, round_num = 0, scale = 0.25):
 	random_numbers = np.clip(random_numbers, _min, _max)
 	return np.random.choice(np.round(random_numbers, round_num), count, replace = True).tolist()
 
-scheduler.add_job(get_fymd_bot, "interval", seconds = 1, id = "get_bot")
+scheduler.add_job(get_fymd_bot, "interval", seconds = 1, id = "rg_get_bot")

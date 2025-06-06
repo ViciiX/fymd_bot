@@ -60,6 +60,10 @@ async def ban(matcher, event):
 		data = DataFile("[data]/group")
 		if (data.get(event.group_id, "r18_mode", False) == False):
 			await matcher.finish("⛔该功能已被禁止！！！⛔")
+	else:
+		users = DataFile("[data]").get("white_list.json", "users", [])
+		if (event.user_id not in users):
+			await matcher.finish("⛔该功能已被禁止！！！⛔")
 
 async def get_message(bot, event, mid, count = 1):
 	if (isinstance(event, GroupMessageEvent)):
@@ -67,3 +71,7 @@ async def get_message(bot, event, mid, count = 1):
 	else:
 		mes = await bot.get_friend_msg_history(user_id = event.user_id, message_id = mid, count = count)
 	return mes["messages"]
+
+async def get_nickname(bot, qq, no_cached = True):
+	name = await bot.get_stranger_info(user_id = qq, no_cached = no_cached)
+	return name["nickname"]

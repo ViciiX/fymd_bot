@@ -437,8 +437,7 @@ async def _(bot: Bot, event: Event):
 	s = ["🦌鹿币排行榜Top 10🦌", LINE]
 	for i in range(10):
 		info = coins[i]
-		name = await bot.get_stranger_info(user_id = info[0], no_cached = True)
-		s.append(f"第{i+1}名：{name["nickname"]} - {info[1]}")
+		s.append(f"第{i+1}名：{await Putil.get_nickname(bot, info[0])} - {info[1]}")
 	s[2] = "🥇" + s[2]
 	s[3] = "🥈" + s[3]
 	s[4] = "🥉" + s[4]

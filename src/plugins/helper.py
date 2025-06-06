@@ -10,6 +10,7 @@ from ..utils import plugin_util as Putil
 from ..utils import image_util as ImageUtil
 
 forhelp = on_regex("^(.*帮助)( (\\d)+)?$")
+LINE = "——————————"
 
 @forhelp.handle()
 async def _(event: Event, args = RegexGroup()):
@@ -36,7 +37,8 @@ async def _(event: Event, args = RegexGroup()):
 			help_list = list(help_dict.keys())
 			index = int(args[2])
 			if (0 <= index and index <= len(help_list)-1):
-				mes = [help_list[index], "————————————", "\n".join(help_dict[help_list[index]])]
+				content = [x.replace("[LINE]", LINE) for x in help_dict[help_list[index]]]
+				mes = [help_list[index], LINE, "\n".join(content)]
 				await Putil.reply(forhelp, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, margin = 50, qq = event.user_id)))
 			else:
 				await Putil.reply(forhelp, event, "404 Not Fucked")
