@@ -47,7 +47,7 @@ subscribe_impart = on_regex("^订阅音趴$|^订阅一起听$")
 unsubscribe_impart = on_regex("^取消订阅音趴$|^取消订阅一起听$")
 topcoin = on_fullmatch("鹿币排行榜")
 present = on_regex("^兑换码 (.+)$")
-t2i = on_regex("^文字转图片\n([\\s\\S]+)")
+t2i = on_regex("^文字转图片\n([\\s\\S]+)$")
 
 set_t2i = on_regex("^文转图设置 (背景颜色|字体|字体颜色)[：|:| ](.+)$|文转图设置")
 
@@ -536,7 +536,7 @@ async def _(event: Event, args = RegexGroup()):
 		mes = ["文字转图片设置", LINE, \
 		"可用选项：", "背景颜色 / 字体颜色 / 字体", LINE, \
 		"字体支持(区分大小写)：", \
-		"Noto：Noto Sans", "OPPO：OPPO字体", "Pixel：Fusion Pixel像素字体", "Zhengdao：庞门正道标题体", "Zhanku：站酷高端黑", LINE, \
+		"Noto：Noto Sans", "OPPO：OPPO字体", "Pixel：Fusion Pixel像素字体(10px)", "Pixel12px：Fusion Pixel像素字体(12px)", "Zhengdao：庞门正道标题体", "Zhanku：站酷高端黑", LINE, \
 		"发送“文转图设置 【选项】 【选项值】”进行设置", LINE, \
 		"示例：", "文转图设置 背景颜色 black", "文转图设置 字体颜色 lightgreen", "文转图设置 字体 Pixel"]
 		await Putil.reply(set_t2i, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)) + "字体颜色支持hex(#xxxxxx), rgb(rgb(xx,xx,xx))等格式\n详见：https://pillow.readthedocs.io/en/stable/reference/ImageColor.html#color-names")
@@ -544,7 +544,7 @@ async def _(event: Event, args = RegexGroup()):
 		data = DataFile(f"[data]/user/{event.user_id}")
 		settings = data.get("settings.json", "text_to_image", {})
 		if (args[0] == "字体"):
-			if (args[1] in ["Pixel", "Noto", "OPPO", "Zhengdao", "Zhanku"]):
+			if (args[1] in ["Pixel", "Pixel12px", "Noto", "OPPO", "Zhengdao", "Zhanku"]):
 				settings["font_name"] = args[1]
 			else:
 				await Putil.reply(set_t2i, event, "字体不存在！", True)

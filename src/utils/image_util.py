@@ -66,7 +66,7 @@ def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "
 		texts = new_texts
 
 	width = max(min_size[0], width + margin * 2)
-	height = max(min_size[1], margin * 2 + sum([max(font.getbbox("汉字")[3], font.getbbox(text)[3]) for text in texts]))
+	height = max(min_size[1], margin * 2 + round(font.getbbox("汉字")[3] * 1.5) * len(texts))
 	
 	with Image.new(mode = "RGBA", size = (width, height), color = bg_color) as img:
 		with Pilmoji(img) as draw:

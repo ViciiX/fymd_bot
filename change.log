@@ -1,6 +1,6 @@
-2025.6.6  Afternoon Update
-降低卡牌回收的价格
-将帮助功能整合在helper.py
-添加字体：Fushion Pixel，站酷高端黑，庞门正道标题体
-ImageUtil： text_to_image支持根据qq号使用用户自定义的背景和字体
-支持用户自定义文转图背景和字体
+2025.6.6 Night Update
+卡牌回收价格支持在cards.json里自定义
+新增卡池“鹿币大转盘”
+支持查看卡池收集进度
+文转图添加字体：Fusion Pixel 12px
+补全help.json

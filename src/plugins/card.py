@@ -17,6 +17,7 @@ my_card = on_fullmatch("我的卡牌")
 my_level_card = on_regex("^我的卡牌 (C|B|A|S|SSS|SSR|c|b|a|s|sss|ssr)$")
 my_all_card = on_regex("^我的全部卡牌$|^我的所有卡牌$|^查看所有卡牌$")
 card_pools = on_regex("^卡池 (\\d+)$|^卡池$")
+pool_progress = on_regex("^卡池进度 (\\d+)$")
 get_cards = on_regex("^抽卡 (\\d+) (\\d+)$")
 check = on_regex("^查看卡牌 (\\d+)$")
 daily_bro = on_fullmatch("每日群友")
@@ -54,13 +55,13 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 			pool = all_card.get(pool_name)
 			status = "💥" if (pool.get("deadline", None) != None) else "✅"
 			mes.append(f"{i}.{status}{pool_name}")
-		mes.extend([LINE, "卡池名称前的数字为卡池id", "✅为常驻卡池, 💥为限时卡池", "发送“卡池 [id]”查看详细信息"])
+		mes.extend([LINE, "卡池名称前的数字为卡池id", "✅为常驻卡池, 💥为限时卡池", "发送“卡池 [id]”查看详细信息", "发送“卡池进度 [id]”查看收集进度"])
 		await card_pools.finish("\n".join(mes))
 	else:
 		index = int(args[0])
 		if (0 <= index and index < len(get_avaliable_pools())):
 			await Putil.processing(bot, event)
-			pool_name = list(get_avaliable_pools())[index]
+			pool_name = get_avaliable_pools()[index]
 			pool = all_card.get(pool_name)
 			deadline = pool.get("deadline", None)
 			mes = ["✨卡池信息✨", LINE, f"卡池名：{pool_name}", f"卡池id：{index}"]
@@ -89,6 +90,31 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 				await card_pools.finish(MessageSegment.image(ImageUtil.text_to_image("\n\n".join(msg), width = None, qq = event.user_id)))
 		else:
 			await card_pools.finish("卡池不存在！")
+
+@pool_progress.handle()
+async def _(bot: Bot, event: Event, args = RegexGroup()):
+	index = int(args[0])
+	if (0 <= index and index < len(get_avaliable_pools())):
+		data = DataFile("[data]/DATA/card")
+		item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
+		pool_name = get_avaliable_pools()[index]
+		pool_data = data.get("cards.json", pool_name, {})
+		count = [0, 0]
+		mes = [f"{event.sender.nickname} 的【{pool_name}】卡池收集进度："]
+		for level in LEVELS:
+			cards = pool_data.get(level, [])
+			if (len(cards) != 0):
+				count[1] += len(cards)
+				i = 0
+				for card in cards:
+					if (item.find(card, None)[1] != None):
+						i += 1
+				count[0] += i
+				mes.append(f"『{level}』级卡牌：{i}/{len(cards)} ({round(i / len(cards) * 100, 2)}%)")
+		mes.append(f"总计：{count[0]}/{count[1]} ({round(count[0] / count[1] * 100, 2)}%)")
+		await Putil.reply(pool_progress, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
+	else:
+		await Putil.reply(pool_progress, event, "卡池不存在！")
 
 @my_card.handle()
 async def _(event: Event):
@@ -286,10 +312,16 @@ async def _(event: Event, args = RegexGroup()):
 
 def get_price(item):
 	pool_data = DataFile("[data]/DATA/card").get("cards.json", item["data"]["pool"], {})
-	basic_price = pool_data.get("cost", 1) * 0.1 * pool_data.get("sell_revision", 1)
+	revision = pool_data.get("sell_revision", {})
+	basic_price = pool_data.get("cost", 1) * 0.1 * revision.get("scale", 1)
 	weight = pool_data.get("weight")
 	ratio = sum([weight.get(level, 0) for level in LEVELS]) / weight[item["data"]["level"]]
-	return basic_price * ratio
+	price = basic_price * ratio
+	#查找对应等级是否有自定义价格
+	price = revision.get(item["data"]["level"], price)
+	#查找是否有特定卡牌的自定义价格
+	price = revision.get("specific", {}).get(item["name"], price)
+	return price
 
 def get_item_info(item):
 	data = DataFile("[data]")
