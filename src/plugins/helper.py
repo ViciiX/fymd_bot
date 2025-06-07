@@ -9,7 +9,7 @@ from ..utils import util as Util
 from ..utils import plugin_util as Putil
 from ..utils import image_util as ImageUtil
 
-forhelp = on_regex("^(.*帮助)( (\\d)+)?$")
+forhelp = on_regex("^(.*帮助)( (\\d+))?$")
 LINE = "——————————"
 
 @forhelp.handle()

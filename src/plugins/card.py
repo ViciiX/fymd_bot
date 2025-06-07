@@ -274,7 +274,7 @@ async def _(bot: Bot, event: Event):
 	for i in range(len(goods)):
 		item = goods[i][0]
 		mes.append(f"- [{goods[i][1]}]『{item["data"]["level"]}』{item["name"]} * {item["amount"]}【{item["cost"]}🦌币/张】")
-	mes.extend([LINE, "卡牌名称前数字为商品编号", "发送“卡牌帮助 8”了解如何上架卡牌", "发送“下架 [商品编号]”下架商品"])
+	mes.extend([LINE, "卡牌名称前数字为商品编号", "发送“卡牌帮助 10”了解如何上架卡牌", "发送“下架 [商品编号]”下架商品"])
 	await Putil.sending(bot, event)
 	await myshop.finish(MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
 
@@ -313,24 +313,27 @@ async def _(event: Event, args = RegexGroup()):
 	user_item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
 	index = int(args[0])
 	if (0 <= index and index < len(user_item.items)):
-		item = user_item.items[index]
-		if (item["amount"] >= int(args[1])):
-			data = DataFile("[data]")
-			goods = data.get("shop.json", "goods", [])
-			goods_data = {
-				"name": item["name"],
-				"amount": int(args[1]),
-				"cost": int(args[2]),
-				"text": args[4],
-				"keeper": event.user_id,
-				"data": item["data"]
-			}
-			goods.append(goods_data)
-			data.set("shop.json", "goods", goods)
-			user_item.reduce(item["name"], int(args[1]), item["data"])
-			await Putil.reply(launch, event, "✨✅上架成功！\n有人购买后会通过私聊提醒(有bot好友的话)~")
+		if (int(args[1]) > 0):
+			item = user_item.items[index]
+			if (item["amount"] >= int(args[1])):
+				data = DataFile("[data]")
+				goods = data.get("shop.json", "goods", [])
+				goods_data = {
+					"name": item["name"],
+					"amount": int(args[1]),
+					"cost": int(args[2]),
+					"text": args[4],
+					"keeper": event.user_id,
+					"data": item["data"]
+				}
+				goods.append(goods_data)
+				data.set("shop.json", "goods", goods)
+				user_item.reduce(item["name"], int(args[1]), item["data"])
+				await Putil.reply(launch, event, "✨✅上架成功！\n有人购买后会通过私聊提醒(有bot好友的话)~")
+			else:
+				await Putil.reply(launch, event, "你没有这么多卡牌！")
 		else:
-			await Putil.reply(launch, event, "你没有这么多卡牌！")
+			await Putil.reply(launch, event, "何意味")
 	else:
 		await Putil.reply(launch, event, "未找到该卡牌id！")
 
@@ -557,7 +560,7 @@ async def get_item_check(bot, current_item, owner):
 等级： 『{current_item.get("data", {}).get("level", "?")}』
 拥有者：{await Putil.get_nickname(bot, owner)}
 拥有数量：{current_item.get("amount", "?")}
-回收单价：{get_price(current_item)} 🦌币""".split("\n")
+回收单价：{round(get_price(current_item), 2)} 🦌币""".split("\n")
 	mes.append(LINE)
 
 	data = DataFile("[data]")

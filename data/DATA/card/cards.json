@@ -116,6 +116,37 @@
 		"text": "鹿币大转盘，敢鹿你就来！\n温馨提示：适度娱乐，不要上头"
 	},
 
+	"Minecraft": {
+		"B": ["[mc]小鸡", "[mc]草方块", "[mc]Diorite", "[mc]电工猫", "[mc]乐工鸡", "[mc]钳工蟹", "[mc]土工狗", "[mc]月工门"],
+		"A": ["[mc]牛魔", "[mc]杰西", "[mc]肉乐", "[mc]流萤", "[mc]fading light", "[mc]haibao", "[mc]Trance魔柠"],
+		"S": ["[mc]牛魔 - 一家人", "[mc]色祖师", "[mc]绿宝石", "[mc]张先生", "[mc]肉乐 - 蓝灯泡"],
+		"SSS": ["[mc]牛魔 - 机械动力", "[mc]WidNac", "[mc]肉乐 - 蓝石灯", "[mc]12"],
+		"SSR": ["[mc]流萤 - 花海"],
+		"weight": {
+			"SSR": 5,
+			"SSS": 15,
+			"S": 40,
+			"A": 190,
+			"B": 750
+		},
+		"card_text": {
+			"general": "Minecraft主题(?)卡牌~",
+			"specific": [
+				["What is this? Diorite. What's that? Diorite. Fucking Diorite man.", ["[mc]Diorite"]]
+			]
+		},
+		"sell_revision": {
+			"specific": {
+				"[mc]绿宝石": 40,
+				"[mc]流萤 - 花海": 80,
+				"[mc]Diorite": 0.01
+			}
+		},
+		"cost": 4,
+		"text": "Minecraft(?)主题卡池！包含Diorite",
+		"deadline": "2025-7-1 0:0:0"
+	},
+
 	"_每日群友_": {
 		"C": ["电工猫", "乐工鸡", "钳工蟹", "土工狗", "月工门"],
 		"B": ["DJ明哥", "牛魔", "肉乐", "fading light", "杰西", "Trance魔柠", "fading light - 飞腚来特", "肉乐 - 蓝灯泡", "色祖师", "张先生", "流萤", "haibao", "WidNac", "TRR", "红色高棉第一深情"],
