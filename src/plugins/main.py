@@ -14,7 +14,7 @@ from nonebot.exception import AdapterException
 from nonebot.params import RegexGroup
 from nonebot.adapters.onebot.v11.event import GroupMessageEvent
 
-from ..utils.file import DataFile
+from ..utils.file import DataFile, Logger
 from ..utils import util as Util
 from ..utils import plugin_util as Putil
 from ..utils import image_util as ImageUtil
@@ -64,7 +64,10 @@ LINE = "——————————"
 
 @test.handle()
 async def _(bot: Bot, event: Event):
-	pass
+	a = Logger("test", "[data]/a.log")
+	a.info("test")
+	a.template = "[TIME]-->[TEXT]"
+	a.custom("TEST")
 
 
 @sendsrc.handle()

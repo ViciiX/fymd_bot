@@ -173,7 +173,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 		current_item = item.items[index]
 		mes = await get_item_check(bot, current_item, event.user_id)
 		await Putil.sending(bot, event)
-		await Putil.reply(check, event, MessageSegment.image(get_card_image(current_item["name"], current_item.get("data", {}).get("level", "C"))) + "\n".join(mes))
+		await Putil.reply(check, event, MessageSegment.image(get_card_image(current_item["name"], current_item.get("data", {}).get("level", "C"))) + MessageSegment.image(get_card_image(current_item["name"], current_item.get("data", {}).get("level", "C"), add_border = False)) + "\n".join(mes))
 	else:
 		await Putil.reply(check, event, "未找到该卡牌id！")
 
@@ -359,25 +359,65 @@ async def _(event: Event, args = RegexGroup()):
 async def _(event: Event, bot: Bot, args = RegexGroup()):
 	await Putil.processing(bot, event)
 	keywords = [x for x in args[0].split(" ") if (x != "")]
+
+	if (len(keywords) == 0):
+		keywords = [" "]
+
+	#获取参数
+	options = {}
+	for i in range(len(keywords)):
+		kv = keywords[i].split(":") #key and value
+		if (len(kv) == 2):
+			options[kv[0]] = kv[1]
+			keywords[i] = None
+	keywords = [x for x in keywords if (x != None)]
+
+	if (len(keywords) == 0):
+		keywords = None
+
 	data = DataFile("[data]")
 	goods = data.get("shop.json", "goods", [])
 	result = [[], []]
 	for i in range(len(goods)):
 		good = goods[i]
-		if (any([x in good["name"] for x in keywords])):
-			result[0].append([good, i, sum([len(x) / len(good["name"]) for x in keywords])])
+		if (options == {}):
+			is_accessible = True
 		else:
-			if (any([x in (good["text"] if (good["text"] != None) else "") for x in keywords])):
-				result[1].append([good, i, sum([len(x) / len(good["text"]) for x in keywords])])
+			cond = []
+			for opt, values in options.items():
+				if (opt == "level"):
+					cond.append(good["data"]["level"] in [x.upper() for x in values.split(",")])
+				elif (opt == "user"):
+					cond.append(str(good["keeper"]) in values.split(","))
+				elif (opt == "price"):
+					price_range = values.split(",")
+					_min = 0 if (price_range[0] == "") else int(price_range[0])
+					_max = None if (price_range[1] == "") else int(price_range[1])
+					cond.append((_min <= good["cost"] and good["cost"] <= _max) if (_max != None) else (_min <= good["cost"]))
+			is_accessible = all(cond)
+
+		if (is_accessible):
+			if (keywords == None):
+				result[0].append([good, i, 0])
+			elif (any([x in good["name"] for x in keywords])):
+				result[0].append([good, i, sum([len(x) / len(good["name"]) for x in keywords])])
+			else:
+				if (any([x in (good["text"] if (good["text"] != None) else "") for x in keywords])):
+					result[1].append([good, i, sum([len(x) / len(good["text"]) for x in keywords])])
+
 	result = result[0] + result[1]
 	result.sort(key = lambda x: x[2], reverse = True)
-	mes = ["🔎市场搜索🔎", f"关键词：{"、".join(keywords)}", f"共搜索到【{len(result)}】条结果：", LINE]
+	page = int(options.get("page", 0))
+
+	mes = ["🔎市场搜索🔎", f"关键词：{"、".join([f"【{x}】" for x in keywords]) if (keywords != None) else "无"}", f"参数：{"\n- ".join([""] + [f'{x[0]} = {x[1]}' for x in list(options.items())]) if (options != {}) else "无"}", f"共搜索到【{len(result)}】条结果：", LINE]
 	if (len(result) == 0):
 		mes.append("~_~")
-	for g in result:
+	for g in result[20 * page: 20 * (page + 1)]:
 		item = g[0]
 		mes.append(f"- [{g[1]}]『{item["data"]["level"]}』{item["name"]} * {item["amount"]}【{item["cost"]}🦌币/张】")
 	mes.append(LINE)
+	if (len(result) > 20 * (page + 1)):
+		mes.append(f"当前为第【{page}】页 | 共【{math.ceil(len(result) / 20) - 1}】页")
 	await Putil.sending(bot, event)
 	await Putil.reply(shop_search, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
 
@@ -430,8 +470,10 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 	index = int(args[0])
 	if (0 <= index and index < len(goods)):
 		good = goods[index]
-		mes = await get_item_check(bot, good, good["keeper"])
-		mes = ["💰商品信息💰"] + mes + ["商品介绍：", good["text"] if (good["text"] != None) else "无"]
+		mes = ["💰商品信息💰"]
+		mes.extend(await get_item_check(bot, good, good["keeper"]))
+		mes.extend(["商品介绍：", good["text"] if (good["text"] != None) else "无", f"商品售价：{good["cost"]}🦌币/张"])
+		await Putil.sending(bot, event)
 		await Putil.reply(shop_check, event, MessageSegment.image(get_card_image(good["name"], good["data"]["level"])) + MessageSegment.image(ImageUtil.text_to_image(mes, qq = event.user_id)))
 	else:
 		await Putil.reply(shop_check, event, "未找到该商品编号！")

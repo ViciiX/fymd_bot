@@ -1,10 +1,11 @@
-import os, json, re
+import os, json, re, datetime
 import pandas as pd
 
 class DataFile:
-	def __init__(self, path = "[data]"):
+	def __init__(self, path = "[data]", logger = None):
 		self.error = ""
 		self.path = path.replace("[data]", os.path.join(os.getcwd(),"data")).replace("[main]", os.getcwd())
+		self.logger = logger
 
 	def set_path(self, path):
 		self.path = path.replace("[data]", os.path.join(os.getcwd(),"data")).replace("[main]", os.getcwd())
@@ -85,18 +86,22 @@ class DataFile:
 			return e
 
 
-	def add_num(self, path, key, value):
+	def add_num(self, path, key, value, log_text = None):
 		current_value = self.get(path, key, 0)
 		if (type(current_value) == int):
+			if (self.logger != None and log_text != None):
+				self.logger.custom(log_text)
 			self.set(path, key, current_value + value)
 			return current_value + value
 		else:
 			return "str"
 
-	def remove_num(self, path, key, value):
+	def remove_num(self, path, key, value, log_text = None):
 		current_value = self.get(path, key, 0)
 		if (type(current_value) == int):
 			if (current_value >= value):
+				if (self.logger != None and log_text != None):
+					self.logger.custom(log_text)
 				self.set(path, key, current_value - value)
 				return True
 			else:
@@ -324,3 +329,37 @@ class Item:
 			s.append("".join([str(x) for x in t]))
 
 		return "\n".join(s)
+
+class Logger:
+	def __init__(self, source, path, template = "[TIME] [SOURCE] | [TEXT]"):
+		self.path = os.path.dirname(path).replace("[data]", os.path.join(os.getcwd(),"data")).replace("[main]", os.getcwd())
+		self.path = os.path.join(self.path, os.path.basename(path))
+		self.source = source
+		self.template = template
+
+	def log(self, log_type, text):
+		if (type(text) == str):
+			with open(self.path, "a", encoding = "utf-8") as f:
+				f.write(f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}] [{log_type.upper()}] [{self.source}] | {text}\n")
+		else:
+			with open(self.path, "a", encoding = "utf-8") as f:
+				f.write(f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}] [{log_type.upper()}] [{self.source}] {{{"\n --> ".join([""] + text)}}}\n")
+
+	def info(self, text):
+		self.log("INFO", text)
+
+	def warn(self, text):
+		self.log("INFO", text)
+
+	def error(self, text):
+		self.log("ERROR", text)
+
+	def custom(self, text, template = None):
+		if (template == None):
+			template = self.template
+		if (type(text) == str):
+			with open(self.path, "a", encoding = "utf-8") as f:
+				f.write(template.replace("[TIME]", f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}]").replace("[SOURCE]", f"[{self.source}]").replace("[TEXT]", text) + "\n")
+		else:
+			with open(self.path, "a", encoding = "utf-8") as f:
+				f.write(template.replace("[TIME]", f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}]").replace("[SOURCE]", f"[{self.source}]").replace("[TEXT]", f"{{\n{"\n --> ".join([""] + text)}\n}}") + "\n")

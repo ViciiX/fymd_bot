@@ -1,4 +1,6 @@
-2025.6.7 Afternoon Update
-修复了可以上架0张卡牌的bug
-修复了帮助功能匹配的bug
-添加新卡池“Minecraft”
+2025.6.8 Early Update
+添加简单的Logger类
+修复了卡牌查看没有包含商品售价的bug
+查看卡牌现在会包含原图
+市场搜索：支持指定卡牌等级(level)，用户qq号(user)， 价格(price)进行搜索
+市场搜索：对于大于20条的搜索结果，支持指定页数(page)查看
