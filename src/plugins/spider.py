@@ -14,7 +14,7 @@ from nonebot.rule import to_me
 from nonebot.permission import SUPERUSER
 from nonebot.params import RegexGroup
 
-from ..utils.file import DataFile
+from ..utils.file import DataFile, Logger
 from ..utils import util as Util
 from ..utils import plugin_util as Putil
 from ..utils import image_util as ImageUtil
@@ -68,22 +68,24 @@ async def _(bot: Bot, event: Event):
 @get_code_info.handle()
 async def _(bot: Bot, event: Event, args = RegexGroup()):
 	await Putil.ban(get_code_info, event)
-	data = DataFile(f"[data]/user/{event.user_id}")
+	data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "获取车牌号"))
 	if (data.remove_num("profile", "coin", 1)):
 		await Putil.processing(bot, event)
 		try:
 			info = await get_info_from_code(args[0])
 			if (info["status_code"] == 200):
 				try:
-					send_str = f"""片名：{info["name"]}
-		车牌号：{args[0]}
-		发行日期：{info.get("date", "暂无")}
-		时长：{info.get("length", "暂无")}
-		演员：{"，".join(info.get("actors", ["暂无"]))}
-		导演：{info.get("director", "暂无")}
-		制作商：{info.get("producer", "暂无")}
-		发行商：{info.get("publisher", "暂无")}
-		分类：{"，".join(info.get("genres", ["暂无"]))}"""
+					send_str = f"""
+片名：{info["name"]}
+车牌号：{args[0]}
+发行日期：{info.get("date", "暂无")}
+时长：{info.get("length", "暂无")}
+演员：{"，".join(info.get("actors", ["暂无"]))}
+导演：{info.get("director", "暂无")}
+制作商：{info.get("producer", "暂无")}
+发行商：{info.get("publisher", "暂无")}
+分类：{"，".join(info.get("genres", ["暂无"]))}
+""".strip()
 					await Putil.sending(bot, event)
 					# for mes in [MessageSegment.image(info["image"]), send_str, "预览："] + [MessageSegment.image(b) for b in info["samples"]]:
 					# 	await get_code_info.send(mes)
@@ -92,19 +94,21 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 					pass
 				except Exception as e:
 					print(type(e),e)
-					data.add_num("profile", "coin", 1)
-					await Putil.reply(get_code_info, event, f"""发送时发生了一些错误！
+					data.add_num("profile", "coin", 1, log_reason = "发送失败")
+					await Putil.reply(get_code_info, event, f"""
+发送时发生了一些错误！
 {e}
-也许是服务器网络波动？待会再试试？""")
+也许是服务器网络波动？待会再试试？
+""".strip())
 
 			elif (info["status_code"] == 404):
-				data.add_num("profile", "coin", 1)
-				await Putil.reply(get_code_info, event, "~~404 Not Found~~")
+				data.add_num("profile", "coin", 1, "未找到")
+				await Putil.reply(get_code_info, event, "404 Not Fucked")
 			else:
-				data.add_num("profile", "coin", 1)
+				data.add_num("profile", "coin", 1, "获取失败")
 				await Putil.reply(get_code_info, event, "发生了一些错误！")
 		except asyncio.TimeoutError:
-			data.add_num("profile", "coin", 1)
+			data.add_num("profile", "coin", 1, log_reason = "获取超时")
 			await Putil.reply(get_code_info, event, "获取超时！")
 	else:
 		await Putil.reply(get_code_info, event, "需要1个🦌币~")
@@ -133,7 +137,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 
 async def _setu(bot: Bot, matcher: Matcher, event: Event, is_today = False, count = 1):
 	await Putil.ban(matcher, event)
-	data = DataFile(f"[data]/user/{event.user_id}")
+	data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "获取色图"))
 	count = min(count, 10)
 	add_coin = 0
 	if (data.remove_num("profile", "coin", count)):
@@ -145,13 +149,15 @@ async def _setu(bot: Bot, matcher: Matcher, event: Event, is_today = False, coun
 				if (src["status_code"] == 200):
 					try:
 						nodes.append(MessageSegment.video(src["image"]) if (src["is_video"]) else MessageSegment.image(src["image"]))
-						nodes.append(f"""链接：{src.get("link", "无")}
-		ID：{src.get("id", "无")}
-		上传者：{src.get("uploader", "无")}
-		日期：{src.get("date", "无")}
-		源链接：{src.get("src", "无")}
-		评分：{src.get("score", "无")}
-		最喜爱：{src.get("favorites", "无")}""")
+						nodes.append(f"""
+链接：{src.get("link", "无")}
+ID：{src.get("id", "无")}
+上传者：{src.get("uploader", "无")}
+日期：{src.get("date", "无")}
+源链接：{src.get("src", "无")}
+评分：{src.get("score", "无")}
+最喜爱：{src.get("favorites", "无")}
+""".strip())
 					except MatcherException:
 						pass
 					except Exception as e:
@@ -178,7 +184,7 @@ async def _setu(bot: Bot, matcher: Matcher, event: Event, is_today = False, coun
 			print(e)
 			add_coin = count
 			await Putil.reply(matcher, event, "发送失败TT，🦌币已返还")
-		data.add_num("profile", "coin", add_coin)
+		data.add_num("profile", "coin", add_coin, log_reason = "发送失败退还")
 
 	else:
 		await Putil.reply(matcher, event, f"需要{count}个🦌币~")

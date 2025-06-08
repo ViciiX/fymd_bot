@@ -7,7 +7,7 @@ from nonebot import on_fullmatch, on_message, on_regex
 from nonebot.params import RegexGroup
 from PIL import Image
 
-from ..utils.file import DataFile, Item
+from ..utils.file import DataFile, Item, Logger
 from ..utils import util as Util
 from ..utils import plugin_util as Putil
 from ..utils import image_util as ImageUtil
@@ -102,6 +102,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 	if (0 <= index and index < len(get_avaliable_pools())):
 		data = DataFile("[data]/DATA/card")
 		item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
+		user_data = DataFile(f"[data]/user/{event.user_id}/card")
 		pool_name = get_avaliable_pools()[index]
 		pool_data = data.get("cards.json", pool_name, {})
 		count = [0, 0]
@@ -116,7 +117,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 						i += 1
 				count[0] += i
 				mes.append(f"『{level}』级卡牌：{i}/{len(cards)} ({round(i / len(cards) * 100, 2)}%)")
-		mes.append(f"总计：{count[0]}/{count[1]} ({round(count[0] / count[1] * 100, 2)}%)")
+		mes.extend([f"总计：{count[0]}/{count[1]} ({round(count[0] / count[1] * 100, 2)}%)", LINE, f"已抽卡『{user_data.get("info.json", "pool_count", {}).get(pool_name, 0)}』次"])
 		await Putil.reply(pool_progress, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
 	else:
 		await Putil.reply(pool_progress, event, "卡池不存在！")
@@ -179,7 +180,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 
 @get_cards.handle()
 async def _(bot: Bot, event: Event, args = RegexGroup()):
-	data = DataFile(f"[data]/user/{event.user_id}")
+	data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "抽卡"))
 	pool = int(args[0])
 	times = int(args[1])
 	cdata = DataFile("[data]/DATA/card")
@@ -192,7 +193,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 				await Putil.processing(bot, event)
 				cards = get_card(pool_name, times)
 				item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
-				mes = [f"{event.sender.nickname} 的{times}连抽卡记录", f"卡池：{pool_name}", f"消费：{times * cost}🦌币", f"卡牌图片为缩略图，原图请发送“我的卡牌”查看"]
+				mes = [f"{event.sender.nickname} 的{times}连抽卡记录", f"卡池：{pool_name}", f"消费：{times * cost}🦌币", f"卡牌图片为缩略图，原图请发送“我的卡牌”查看", "[LINE]"]
 				level_count = {}
 				for card in cards:
 					card_name = card[0]
@@ -202,22 +203,26 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 					item.add(card_name, 1, card_data, False)
 					mes.append(MessageSegment.image(ImageUtil.thumbnail(get_card_image(card_name, level, False), (100, 150))))
 					mes.append({"S": "✨Nice！✨\n", "SSS": "🎉Ohhhhhh！🎉\n", "SSR": "🎊👑这、这是？！👑🎊\n"}.get(level, "") + f"恭喜你抽到了『{level}』级卡牌：\n{card_name}！" + {"S": "\nGood Luck！", "SSS": "\n欧皇！", "SSR": "\n哇！金色传说！！"}.get(level, ""))
+					mes.append("[LINE]")
 				item.save()
 				total_mes = ["🎉本次抽卡获得🎉"]
 				for level in LEVELS:
 					if (level in level_count):
 						total_mes.append(f"『{level}』级卡牌：{level_count[level]} 张！")
 				mes.append("\n".join(total_mes))
+				info = data.get("card/info.json", "pool_count", {})
+				info[pool_name] = info.get(pool_name, 0) + times
+				data.set("card/info.json", "pool_count", info)
 				await Putil.sending(bot, event)
 				try:
-					await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", mes)])
+					await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", [x for x in mes if (x != "[LINE]")])])
 				except Exception as e:
 					print(f"发送带图片卡牌结果错误：{e}")
 					try:
-						await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", ["(图片发送失败)"]+[x for x in mes if (type(x) == str)])])
+						await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd抽卡"]}, [("bot", ["(图片发送失败)"]+[x for x in mes if (type(x) == str and x != "[LINE]")])])
 					except Exception as e:
 						print(f"发送纯文字卡牌结果错误：{e}")
-						await Putil.reply(get_cards, event, "消息被风控发送失败了！😭\n以下是纯文字结果：" + MessageSegment.image(ImageUtil.text_to_image("\n".join([x for x in mes if (type(x) == str)]), qq = event.user_id)))
+						await Putil.reply(get_cards, event, "消息被风控发送失败了！😭\n以下是纯文字结果：" + MessageSegment.image(ImageUtil.text_to_image("\n".join([x.replace("[LINE]", LINE) for x in mes if (type(x) == str)]), qq = event.user_id)))
 			else:
 				await Putil.reply(get_cards, event, f"需要{times * cost}🦌币！")
 		else:
@@ -291,7 +296,7 @@ async def _(event: Event, args = RegexGroup()):
 			price = math.floor(unit_price * args[1])
 			if (price >= 1):
 				item_data = Item(f"[data]/user/{event.user_id}/card/mycard.json")
-				user_data = DataFile(f"[data]/user/{event.user_id}")
+				user_data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "回收卡牌"))
 				item_data.reduce(item["name"], args[1], item["data"])
 				user_data.add_num("profile", "coin", price)
 				await Putil.reply(sell, event, f"""
@@ -431,12 +436,12 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 		good = goods[index]
 		if (int(args[1]) > 0):
 			if (good["amount"] >= int(args[1])):
-				user_data = DataFile(f"[data]/user/{event.user_id}")
+				user_data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "购买卡牌"))
 				cost = good["cost"] * int(args[1])
 				if (user_data.remove_num("profile", "coin", cost)):
 					user_item.add(good["name"], int(args[1]), good["data"])
 					good["amount"] -= int(args[1])
-					keeper_data = DataFile(f"[data]/user/{good["keeper"]}")
+					keeper_data = DataFile(f"[data]/user/{good["keeper"]}", Logger(f"[data]/user/{good["keeper"]}/log/coin.log", "市场出售卡牌"))
 					keeper_data.add_num("profile", "coin", cost)
 					if (good["amount"] > 0):
 						goods[index] = good

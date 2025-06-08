@@ -6,6 +6,8 @@ class DataFile:
 		self.error = ""
 		self.path = path.replace("[data]", os.path.join(os.getcwd(),"data")).replace("[main]", os.getcwd())
 		self.logger = logger
+		if (self.logger != None and self.logger.limit == None):
+			self.logger.limit = 10
 
 	def set_path(self, path):
 		self.path = path.replace("[data]", os.path.join(os.getcwd(),"data")).replace("[main]", os.getcwd())
@@ -86,22 +88,22 @@ class DataFile:
 			return e
 
 
-	def add_num(self, path, key, value, log_text = None):
+	def add_num(self, path, key, value, log_reason = "", log_text = "[before] --> [after] (+[value])"):
 		current_value = self.get(path, key, 0)
 		if (type(current_value) == int):
-			if (self.logger != None and log_text != None):
-				self.logger.custom(log_text)
+			if (self.logger != None):
+				self.logger.custom(f"{log_reason}：{log_text}".replace("[before]", str(current_value)).replace("[after]", str(current_value + value)).replace("[value]", str(value)))
 			self.set(path, key, current_value + value)
 			return current_value + value
 		else:
 			return "str"
 
-	def remove_num(self, path, key, value, log_text = None):
+	def remove_num(self, path, key, value, log_reason = "", log_text = "[before] --> [after] (-[value])"):
 		current_value = self.get(path, key, 0)
 		if (type(current_value) == int):
 			if (current_value >= value):
-				if (self.logger != None and log_text != None):
-					self.logger.custom(log_text)
+				if (self.logger != None):
+					self.logger.custom(f"{log_reason}：{log_text}".replace("[before]", str(current_value)).replace("[after]", str(current_value - value)).replace("[value]", str(value)))
 				self.set(path, key, current_value - value)
 				return True
 			else:
@@ -202,7 +204,39 @@ class DataFile:
 		except Exception as e:
 			self.error = e
 			print(e)
-			return 
+			return
+
+	def get_plain_text(self, path):
+		path = os.path.join(self.path, path)
+		try:
+			with open(path,"r", encoding='utf-8') as file:
+				try:
+					self.error = ""
+					return file.read()
+				except Exception as err:
+					print(err)
+					self.error = err
+					return False
+		except Exception as e:
+			self.error = e
+			print(e)
+			return False
+
+	def get_plain_text_lines(self, path):
+		path = os.path.join(self.path, path)
+		try:
+			with open(path,"r", encoding='utf-8') as file:
+				try:
+					self.error = ""
+					return file.readlines()
+				except Exception as err:
+					print(err)
+					self.error = err
+					return False
+		except Exception as e:
+			self.error = e
+			print(e)
+			return False
 
 	def get_files(self, path, add_path = False, contain_dir = False, contain_file = True):
 		path = os.path.join(self.path, str(path))
@@ -331,19 +365,32 @@ class Item:
 		return "\n".join(s)
 
 class Logger:
-	def __init__(self, source, path, template = "[TIME] [SOURCE] | [TEXT]"):
+	def __init__(self, path, source, template = "[TIME] [SOURCE] | [TEXT]", limit = None):
 		self.path = os.path.dirname(path).replace("[data]", os.path.join(os.getcwd(),"data")).replace("[main]", os.getcwd())
 		self.path = os.path.join(self.path, os.path.basename(path))
+		if (not os.path.exists(os.path.dirname(self.path))):
+			os.makedirs(os.path.dirname(self.path))
 		self.source = source
 		self.template = template
+		self.limit = limit
+
+	def write(self, text):
+		if (self.limit == None or (not os.path.exists(self.path) or os.path.getsize(self.path) < self.limit * 1024)):
+			with open(self.path, "a", encoding = "utf-8") as f:
+				f.write(text)
+		else:
+			with open(self.path, "r", encoding = "utf-8") as f:
+				contents = f.readlines()
+				contents.pop(0)
+				contents.append(text)
+			with open(self.path, "w", encoding = "utf-8") as f:
+				f.write("\n".join(contents))
 
 	def log(self, log_type, text):
 		if (type(text) == str):
-			with open(self.path, "a", encoding = "utf-8") as f:
-				f.write(f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}] [{log_type.upper()}] [{self.source}] | {text}\n")
+			self.write(f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}] [{log_type.upper()}] [{self.source}] | {text}\n")
 		else:
-			with open(self.path, "a", encoding = "utf-8") as f:
-				f.write(f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}] [{log_type.upper()}] [{self.source}] {{{"\n --> ".join([""] + text)}}}\n")
+			self.write(f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}] [{log_type.upper()}] [{self.source}] {{{"\n --> ".join([""] + text)}}}\n")
 
 	def info(self, text):
 		self.log("INFO", text)
@@ -358,8 +405,6 @@ class Logger:
 		if (template == None):
 			template = self.template
 		if (type(text) == str):
-			with open(self.path, "a", encoding = "utf-8") as f:
-				f.write(template.replace("[TIME]", f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}]").replace("[SOURCE]", f"[{self.source}]").replace("[TEXT]", text) + "\n")
+			self.write(template.replace("[TIME]", f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}]").replace("[SOURCE]", f"[{self.source}]").replace("[TEXT]", text) + "\n")
 		else:
-			with open(self.path, "a", encoding = "utf-8") as f:
-				f.write(template.replace("[TIME]", f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}]").replace("[SOURCE]", f"[{self.source}]").replace("[TEXT]", f"{{\n{"\n --> ".join([""] + text)}\n}}") + "\n")
+			self.write(template.replace("[TIME]", f"[{datetime.datetime.now().strftime("%m-%d %H:%M:%S")}]").replace("[SOURCE]", f"[{self.source}]").replace("[TEXT]", f"{{\n{"\n --> ".join([""] + text)}\n}}") + "\n")

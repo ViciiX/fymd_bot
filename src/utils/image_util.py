@@ -53,6 +53,9 @@ def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "
 		if (width == "square"):
 			box = font.getbbox("\n".join(texts))
 			width = round(math.sqrt(box[2] * box[3]))
+		elif (type(width) == list):
+			box = font.getbbox("\n".join(texts))
+			width = round(math.sqrt(box[2] * box[3] * width[0] / width[1]))
 		new_texts = []
 		for text in texts:
 			s = ""

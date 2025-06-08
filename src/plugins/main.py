@@ -1,4 +1,4 @@
-import random, os, pickle
+import random, os, pickle, math
 import datetime, calendar, json
 
 import pandas as pd
@@ -48,6 +48,7 @@ unsubscribe_impart = on_regex("^取消订阅音趴$|^取消订阅一起听$")
 topcoin = on_fullmatch("鹿币排行榜")
 present = on_regex("^兑换码 (.+)$")
 t2i = on_regex("^文字转图片\n([\\s\\S]+)$")
+statement = on_regex("^账单 (\\d+)$|^账单$")
 
 set_t2i = on_regex("^文转图设置 (背景颜色|字体|字体颜色)[：|:| ](.+)$|文转图设置")
 
@@ -64,11 +65,7 @@ LINE = "——————————"
 
 @test.handle()
 async def _(bot: Bot, event: Event):
-	a = Logger("test", "[data]/a.log")
-	a.info("test")
-	a.template = "[TIME]-->[TEXT]"
-	a.custom("TEST")
-
+	pass
 
 @sendsrc.handle()
 async def _():
@@ -162,7 +159,7 @@ async def _(event: Event):
 
 @sign.handle()
 async def _(event: Event):
-	data = DataFile(f"[data]/user/{event.user_id}")
+	data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "签到"))
 	time = datetime.datetime.now()
 	last_time = datetime.datetime.strptime(data.get("profile", "last_sign_time", (time-datetime.timedelta(days = 1)).strftime("%Y-%m-%d")), "%Y-%m-%d")
 	if (time >= (last_time+datetime.timedelta(days = 1))):
@@ -183,7 +180,7 @@ async def _(event: Event):
 		else:
 			group.set("sign", "count", group.get("sign", "count", 0)+1)
 		data.set("profile", "last_sign_time", time.strftime("%Y-%m-%d"))
-		data.set("profile", "coin", coin+amount)
+		data.add_num("profile", "coin", amount)
 		await Putil.reply(sign, event, Message.template("""{}
 签到成功！
 It's time to 🦌！
@@ -207,7 +204,7 @@ async def _(event: Event):
 @rate.handle()
 async def _(event: Event, args = RegexGroup()):
 	amount = int(args[0])
-	data = DataFile(f"[data]/user/{event.user_id}")
+	data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "鹿德"))
 	say = ["hso", "社保", "对不良诱惑说Yes", "这一刻，你就是川哥", "kksk"]
 	target_data = DataFile(f"[data]/user/{event.reply.sender.user_id}")
 	if (event.original_message[0].type == "reply"):
@@ -475,7 +472,7 @@ async def _(event: Event):
 
 @present.handle()
 async def _(event: Event, args = RegexGroup()):
-	user = DataFile(f"[data]/user/{event.user_id}")
+	user = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "兑换码"))
 	codes = DataFile(f"[data]")
 	code = codes.get("gift_code.json", args[0], None)
 	if (code != None):
@@ -558,6 +555,12 @@ async def _(event: Event, args = RegexGroup()):
 		data.set("settings.json", "text_to_image", settings)
 		await Putil.reply(set_t2i, event, "设置成功！" + MessageSegment.image(ImageUtil.text_to_image(["你好，世界！", "Hello, world!", "这是一些emoji: 🦌🦌🦌🦌🦌🦌🦌", "", "测试test1234567890"], width = None, qq = event.user_id)))
 
+@statement.handle()
+async def _(event: Event, args = RegexGroup()):
+	page = int(args[0]) if (args[0] != None) else 0
+	data = DataFile(f"[data]/user/{event.user_id}/log").get_plain_text("coin.log").split("\n")
+	mes = [f"💰{event.sender.nickname} 的账单💰", LINE, "\n".join(data[50 * page : 50 * (page + 1)]).strip(), LINE, f"当前页数：【{page}/{math.ceil(len(data) / 50) - 1}】"]
+	await Putil.reply(statement, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
 
 def get_year_calendar(year):
 	month = pd.DataFrame(index = range(1, 13), columns = range(1, 32), dtype = object)
