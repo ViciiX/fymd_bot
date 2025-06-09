@@ -37,6 +37,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 			try:
 				reply = await request([text_message("system", prompt)] + history, args[0])
 			except Exception:
+				task_data.remove_num("AI.json", "task", 1)
 				await Putil.reply(chat, event, "（看来有一股禁忌的力量干扰了对话）", True)
 			task_data.remove_num("AI.json", "task", 1)
 			if (reply.split("</think>")[1].strip() == "[system]开启新对话"):
@@ -49,7 +50,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 			print(reply)
 			mes = [f"[{event.sender.nickname}]\n{args[0]}", "", f"[Bot]\n{reply.split("</think>")[1].strip()}"]
 			await Putil.sending(bot, event)
-			await Putil.reply(chat, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = [8, 2], qq = event.user_id)))
+			await Putil.reply(chat, event, MessageSegment.image(ImageUtil.text_to_image(mes, qq = event.user_id)))
 		else:
 			await Putil.reply(chat, event, "需要1个鹿币")
 	else:

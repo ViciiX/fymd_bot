@@ -1,16 +1,26 @@
 import os, json, re, datetime
 import pandas as pd
 
+def path_replace(path):
+	re_dict = {
+		"[main]": os.getcwd(),
+		"[data]": os.path.join(os.getcwd(),"data"),
+		"[DATA]": os.path.join(os.getcwd(),"data/DATA")
+	}
+	for key, value in re_dict.items():
+		path = path.replace(key, value)
+	return path
+
 class DataFile:
 	def __init__(self, path = "[data]", logger = None):
 		self.error = ""
-		self.path = path.replace("[data]", os.path.join(os.getcwd(),"data")).replace("[main]", os.getcwd())
+		self.path = path_replace(path)
 		self.logger = logger
 		if (self.logger != None and self.logger.limit == None):
 			self.logger.limit = 10
 
 	def set_path(self, path):
-		self.path = path.replace("[data]", os.path.join(os.getcwd(),"data")).replace("[main]", os.getcwd())
+		self.path = path_replace(path)
 
 	def get_path(self, path):
 		return os.path.join(self.path, str(path))
@@ -366,7 +376,7 @@ class Item:
 
 class Logger:
 	def __init__(self, path, source, template = "[TIME] [SOURCE] | [TEXT]", limit = None):
-		self.path = os.path.dirname(path).replace("[data]", os.path.join(os.getcwd(),"data")).replace("[main]", os.getcwd())
+		self.path = path_replace(os.path.dirname(path))
 		self.path = os.path.join(self.path, os.path.basename(path))
 		if (not os.path.exists(os.path.dirname(self.path))):
 			os.makedirs(os.path.dirname(self.path))

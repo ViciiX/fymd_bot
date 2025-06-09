@@ -557,8 +557,8 @@ async def _(event: Event, args = RegexGroup()):
 
 @statement.handle()
 async def _(event: Event, args = RegexGroup()):
-	page = int(args[0]) if (args[0] != None) else 0
 	data = DataFile(f"[data]/user/{event.user_id}/log").get_plain_text("coin.log").split("\n")
+	page = int(args[0]) if (args[0] != None) else (math.ceil(len(data) / 50) - 1)
 	mes = [f"💰{event.sender.nickname} 的账单💰", LINE, "\n".join(data[50 * page : 50 * (page + 1)]).strip(), LINE, f"当前页数：【{page}/{math.ceil(len(data) / 50) - 1}】"]
 	await Putil.reply(statement, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
 

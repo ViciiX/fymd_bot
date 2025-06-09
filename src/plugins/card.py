@@ -20,7 +20,7 @@ card_pools = on_regex("^卡池 (\\d+)$|^卡池$")
 pool_progress = on_regex("^卡池进度 (\\d+)$")
 get_cards = on_regex("^抽卡 (\\d+) (\\d+)$")
 check = on_regex("^查看卡牌 (\\d+)$")
-daily_bro = on_fullmatch("每日群友")
+daily_bro = on_regex("^每日群友$|^今日群友$")
 
 shop = on_fullmatch("卡牌市场")
 sell = on_regex("^回收卡牌 (\\d+) (\\d+)$")
@@ -36,7 +36,7 @@ LEVELS = ['SSR', 'SSS', 'S', 'A', 'B', 'C']
 
 @detect_pool_avaliable.handle()
 async def _():
-	data = DataFile("[data]/DATA/card")
+	data = DataFile("[DATA]/card")
 	all_card = data.get_raw("cards.json")
 	for pool_name, values in all_card.items():
 		dtime = datetime.datetime.now()
@@ -51,7 +51,7 @@ async def _():
 
 @card_pools.handle()
 async def _(bot: Bot, event: Event, args = RegexGroup()):
-	all_card = DataFile("[data]/DATA/card").get_raw("cards.json")
+	all_card = DataFile("[DATA]/card").get_raw("cards.json")
 	if (args[0] == None):
 		mes = ["📎当前可用的所有卡池", LINE]
 		pools = get_avaliable_pools()
@@ -100,7 +100,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 async def _(bot: Bot, event: Event, args = RegexGroup()):
 	index = int(args[0])
 	if (0 <= index and index < len(get_avaliable_pools())):
-		data = DataFile("[data]/DATA/card")
+		data = DataFile("[DATA]/card")
 		item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
 		user_data = DataFile(f"[data]/user/{event.user_id}/card")
 		pool_name = get_avaliable_pools()[index]
@@ -183,7 +183,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 	data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "抽卡"))
 	pool = int(args[0])
 	times = int(args[1])
-	cdata = DataFile("[data]/DATA/card")
+	cdata = DataFile("[DATA]/card")
 	if (0 <= pool and pool < len(get_avaliable_pools())):
 		if (0 < times and times <= 20):
 			pool_name = get_avaliable_pools()[pool]
@@ -285,7 +285,7 @@ async def _(bot: Bot, event: Event):
 
 @sell.handle()
 async def _(event: Event, args = RegexGroup()):
-	data = DataFile("[data]/DATA/card")
+	data = DataFile("[DATA]/card")
 	args = [int(x) for x in args]
 	user_item = Item(f"[data]/user/{event.user_id}/card/mycard.json")
 	index = args[0]
@@ -492,7 +492,7 @@ def get_user_shop(user_id):
 	return result
 
 def get_price(item):
-	pool_data = DataFile("[data]/DATA/card").get("cards.json", item["data"]["pool"], {})
+	pool_data = DataFile("[DATA]/card").get("cards.json", item["data"]["pool"], {})
 	revision = pool_data.get("sell_revision", {})
 	basic_price = pool_data.get("cost", 1) * 0.1 * revision.get("scale", 1)
 	weight = pool_data.get("weight")
@@ -520,7 +520,7 @@ def get_item_info(item):
 
 def get_card(pool_name, count):
 	cards = get_card_name(pool_name, count)
-	cdata = DataFile("[data]/DATA/card")
+	cdata = DataFile("[DATA]/card")
 	pool_data = cdata.get("cards.json", pool_name, {})
 	result = []
 	for card_name in cards:
@@ -546,7 +546,7 @@ def get_card(pool_name, count):
 	return result
 
 def get_card_name(pool, count):
-	data = DataFile("[data]/DATA/card")
+	data = DataFile("[DATA]/card")
 	pool =  data.get("cards.json", pool, {})
 	all_card = [pool.get(x) for x in LEVELS if (pool.get(x, None) != None)]
 	weight = pool.get("weight", {})
@@ -558,7 +558,7 @@ def get_card_name(pool, count):
 	return result
 
 def pick_level(pool_name, name):
-	pool_data = DataFile("[data]/DATA/card").get("cards.json", pool_name, {})
+	pool_data = DataFile("[DATA]/card").get("cards.json", pool_name, {})
 	for level in LEVELS:
 		if (name in pool_data.get(level, [])):
 			return level
@@ -575,7 +575,7 @@ def get_by_id(_id):
 		return -1
 
 def get_all_card():
-	all_card = DataFile("[data]/DATA/card").get_raw("cards.json")
+	all_card = DataFile("[DATA]/card").get_raw("cards.json")
 	ac = []
 	for pool, value in all_card.items():
 		for level in LEVELS:
@@ -583,7 +583,7 @@ def get_all_card():
 	return ac
 
 def get_avaliable_pools():
-	all_card = DataFile("[data]/DATA/card").get_raw("cards.json")
+	all_card = DataFile("[DATA]/card").get_raw("cards.json")
 	result = []
 	for pool_name, values in all_card.items():
 		if (values.get("avaliable", True) == True):
@@ -591,7 +591,7 @@ def get_avaliable_pools():
 	return result
 
 def get_card_image(name, level = "C", in_bytes = True, add_border = True):
-	data = DataFile("[data]/DATA/card/src")
+	data = DataFile("[DATA]/card/src")
 	if (add_border):
 		card_img = Image.open(data.get_path(f"{name}.png")).resize((1248, 1872))
 		border_img = Image.open(data.get_path(f"card_border/{level}.png"))
