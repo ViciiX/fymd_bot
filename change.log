@@ -1,4 +1,5 @@
-2025.6.9 Afternoon Update
-账单默认页数改为最后一页
-utils/file.py 支持将[DATA]替换为data/DATA目录
-新玩法“农村”开发中
+2025.6.10 Update
+农场新增农场商店、农场购买
+更改商店、作物数据格式
+耕地图片添加了编号
+Farmland更新

@@ -556,10 +556,12 @@ async def _(event: Event, args = RegexGroup()):
 		await Putil.reply(set_t2i, event, "设置成功！" + MessageSegment.image(ImageUtil.text_to_image(["你好，世界！", "Hello, world!", "这是一些emoji: 🦌🦌🦌🦌🦌🦌🦌", "", "测试test1234567890"], width = None, qq = event.user_id)))
 
 @statement.handle()
-async def _(event: Event, args = RegexGroup()):
+async def _(bot: Bot, event: Event, args = RegexGroup()):
+	await Putil.processing(bot, event)
 	data = DataFile(f"[data]/user/{event.user_id}/log").get_plain_text("coin.log").split("\n")
 	page = int(args[0]) if (args[0] != None) else (math.ceil(len(data) / 50) - 1)
 	mes = [f"💰{event.sender.nickname} 的账单💰", LINE, "\n".join(data[50 * page : 50 * (page + 1)]).strip(), LINE, f"当前页数：【{page}/{math.ceil(len(data) / 50) - 1}】"]
+	await Putil.sending(bot, event)
 	await Putil.reply(statement, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
 
 def get_year_calendar(year):

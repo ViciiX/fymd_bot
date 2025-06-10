@@ -1,0 +1,8 @@
+{
+	"胡萝卜": {
+		"name": "carrot",
+		"grow_time": 240,
+		"price": 50,
+		"seed_cost": 10
+	}
+}
