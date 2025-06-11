@@ -5,13 +5,16 @@ import math, datetime, os
 from nonebot.adapters.onebot.v11 import Bot, Event
 from nonebot.adapters.onebot.v11.message import Message, MessageSegment
 from nonebot.adapters.onebot.v11.event import GroupMessageEvent
-from nonebot import on_fullmatch, on_message, on_regex
+from nonebot import on_fullmatch, on_message, on_regex, require
 from nonebot.params import RegexGroup
 
 from ..utils.file import DataFile, Item, Logger
 from ..utils import util as Util
 from ..utils import plugin_util as Putil
 from ..utils import image_util as ImageUtil
+
+require("nonebot_plugin_apscheduler")
+from nonebot_plugin_apscheduler import scheduler
 
 LINE = "——————————"
 src_path = DataFile("[DATA]/farm/src").path
@@ -20,12 +23,15 @@ myland = on_fullmatch("农场")
 storage = on_fullmatch("仓库")
 shop = on_fullmatch("农场商店")
 shop_buy = on_regex("^农场购买 (\\d+) (\\d+)$")
-plant = on_regex("^种植 (\\d+) (\\d+) (.+)$")
+plant = on_regex("^播种 (\\d+) (\\d+) (.+)$")
+water = on_regex("^浇水 (\\d+) (\\d+)$")
 
 @myland.handle()
-async def _(event: Event):
+async def _(bot: Bot, event: Event):
+	await Putil.processing(bot, event)
 	data = DataFile(f"[data]/user/{event.user_id}/farm")
-	land = Farmland(data.get("farmland.json", "farmland", [{}] * 3))
+	land = Farmland(data.get("farmland.json", "farmland", [{}] * 3), [data, "farmland.json", "farmland"])
+	await Putil.sending(bot, event)
 	await Putil.reply(myland, event, f"🌳{event.sender.nickname} 的农场🌳" + MessageSegment.image(land.get_image(datetime.datetime.now())))
 
 @storage.handle()
@@ -88,27 +94,96 @@ async def _(event: Event, args = RegexGroup()):
 		await Putil.reply(shop_buy, event, "何意味")
 
 @plant.handle()
-async def _(event: Event):
+async def _(event: Event, args = RegexGroup()):
 	farm_data = DataFile(f"[data]/user/{event.user_id}/farm")
-	land = Farmland(farm_data.get("farmland.json", "farmland", [{}] * 3))
+	land = Farmland(farm_data.get("farmland.json", "farmland", [{}] * 3), [farm_data, "farmland.json", "farmland"])
+	x, y = int(args[0]), int(args[1])
+	fh = Item(f"[data]/user/{event.user_id}/farm/storage.json")
+	if (fh.find(f"{args[2]}种子")[1] != None):
+		result = land.plant(x, y, args[2], is_save = False)
+		if (result == "Done"):
+			async def time_plant():
+				land.save()
+				fh.reduce(f"{args[2]}种子", 1)
+				await Putil.reply(plant, event, "播种成功！")
+			await Putil.reply(plant, event, "播种中...(10s)")
+			scheduler.add_job(time_plant, "date", run_date = datetime.datetime.now() + datetime.timedelta(seconds = 10))
+		elif (result == "Not In"):
+			await Putil.reply(plant, event, "坐标错误！")
+		elif (result == "Not Found"):
+			await Putil.reply(plant, event, "种子不存在！")
+		elif (result == "Not Empty"):
+			await Putil.reply(plant, event, "这块地上还有作物！")
+	else:
+		await Putil.reply(plant, event, "仓库里没有该作物的种子！")
+
+@water.handle()
+async def _(event: Event, args = RegexGroup()):
+	farm_data = DataFile(f"[data]/user/{event.user_id}/farm")
+	land = Farmland(farm_data.get("farmland.json", "farmland", [{}] * 3), [farm_data, "farmland.json", "farmland"])
+	x, y = int(args[0]), int(args[1])
+	result = land.water(x, y, is_save = False)
+	if (result == "Done"):
+		async def time_water():
+			land.save()
+			await Putil.reply(water, event, "浇水成功！")
+		await Putil.reply(water, event, "浇水中...(10s)")
+		scheduler.add_job(time_water, "date", run_date = datetime.datetime.now() + datetime.timedelta(seconds = 10))
+	elif (result == "Not In"):
+		await Putil.reply(water, event, "坐标错误！")
+	elif (result == "Not Dry"):
+		await Putil.reply(water, event, "你已经浇过水啦~")
+	elif (result == "Can Not"):
+		await Putil.reply(water, event, "没啥好浇水的~")
 
 
 class Farmland: #耕地类
 	"""
-	self.land为二维列表，存储每块地的信息
+	self.land传入时为一维列表，后自动转换为二维列表，存储每块地的信息
 	数据格式：
 	{
 		"state": "str", #状态 --> dry | wet
-		"crop": "str", #种植的作物名
+		"crop": "str", #种植的作物名(资源名)
+		"display_name": "str", #种植的作物的名称，为了方便寻找
 		"plant_time": "xxxx-xx-xx xx:xx:xx", #种植的时间
-		"grow_time": xx #生长所需要的时间(分钟)
+		"grow_time": xx, #生长所需要的时间(分钟)，应不变
+		"water_time": [[], [], ..], #一个嵌套列表，储存[浇水的时间, 浇水的有效截止期]
+		"growth": int #作物已生长的时间(分钟)，由"water_time"计算(截止期-浇水时间)
 	}
 	"""
-	def __init__(self, lands: list):
+	def __init__(self, lands: list, datafile = None):
 		self.land = lands
 		self.width = 0
 		self.height = 0
+		self.datafile = datafile
 		self.shape()
+
+		#根据浇水时间计算每块地作物的生长时间
+		for y in range(self.height):
+			for x in range(self.width):
+				fdata = self.land[y][x]
+				if (fdata.get("crop", None) != None):
+					growth = 0
+					water_time = fdata.get("water_time", [])
+					for start, end in water_time:
+						start = datetime.datetime.strptime(start, "%Y-%m-%d %H:%M:%S")
+						end = datetime.datetime.strptime(end, "%Y-%m-%d %H:%M:%S")
+						end = min(end, datetime.datetime.now())
+						growth += (end - start).seconds
+					#判断干湿
+					if (len(water_time) > 0):
+						end = datetime.datetime.strptime(water_time[-1][1], "%Y-%m-%d %H:%M:%S")
+						if (end < datetime.datetime.now()):
+							self.land[y][x]["state"] = "dry"
+					self.land[y][x]["growth"] = growth / 60
+		self.save()
+
+	def save(self):
+		if (self.datafile != None):
+			self.datafile[0].set(self.datafile[1], self.datafile[2], self.get_flatten())
+			return True
+		else:
+			return False
 
 	def shape(self, width = "auto"):
 		if (width == "auto"):
@@ -118,6 +193,9 @@ class Farmland: #耕地类
 		arr = np.array(self.land + [{}] * (self.width * self.height - len(self.land)))
 		self.land = arr.reshape(self.height, self.width).tolist()
 	
+	def get_flatten(self):
+		return np.array(self.land).flatten().tolist()
+
 	def get_image(self, time, in_bytes = True):
 		#根据时间设置天空亮度
 		noon = time.combine(date = time.date(), time = datetime.time(12, 0, 0))
@@ -145,14 +223,13 @@ class Farmland: #耕地类
 					total_stage = len(os.listdir(os.path.join(src_path, f"crop/{fdata["crop"]}")))
 
 					#根据时间差计算作物生长阶段
-					if (fdata["grow_time"] > 0):
-						i = min(1, (abs(time - plant_time).seconds / 60) / fdata["grow_time"])
-						current_stage = math.floor((total_stage - 1) * i)
-					else:
-						current_stage = total_stage - 1
 
+					i = min(1, fdata["growth"] / fdata["grow_time"])
+					current_stage = math.floor((total_stage - 1) * i)
 					crop = get_src(f"crop/{fdata["crop"]}/{fdata["crop"]}_{current_stage}")
-					img.paste(crop, pos, mask = crop)
+					layer = Image.new("RGBA", (img.size[0], img.size[1]), (0, 0, 0, 0))
+					layer.paste(crop, pos, mask = crop)
+					img = Image.alpha_composite(img, layer)
 
 		img = img.resize((img.size[0] * 8, img.size[1] * 8), Image.Resampling.NEAREST)
 		#打印编号
@@ -165,19 +242,19 @@ class Farmland: #耕地类
 		img = Image.alpha_composite(img, num_img)
 		return ImageUtil.img_to_bytesio(img) if (in_bytes) else img
 
-	def is_in(x, y):
+	def is_in(self, x, y):
 		try:
 			self.land[y][x]
 			return True
 		except Exception:
 			return False
 
-	def get_state(x, y):
+	def get_state(self, x, y):
 		if (self.is_in(x, y)):
 			land = self.land[y][x]
 			if (land.get("crop", None) != None):
 				plant_time = datetime.datetime.strptime(land["plant_time"], "%Y-%m-%d %H:%M:%S")
-				if ((plant_time + datetime.timedelta(minutes = land["grow_time"])) <= datetime.datetime.now()):
+				if (land["growth"] >= land["grow_time"]):
 					return "Mature"
 				else:
 					return "Growing"
@@ -186,7 +263,7 @@ class Farmland: #耕地类
 		else:
 			return "Not In"
 
-	def plant(x, y, name, time):
+	def plant(self, x, y, name, time = datetime.datetime.now(), is_save = True):
 		if (self.is_in(x, y)):
 			land = self.land[y][x]
 			crop_data = DataFile("[DATA]/farm/data").get_raw("crop.json").get(name, None)
@@ -194,11 +271,16 @@ class Farmland: #耕地类
 				if (self.get_state(x, y) == "Empty"):
 					land_data = {
 						"state": land.get("state", "dry"),
-						"crop": name,
+						"crop": crop_data.get("name", name),
+						"display_name": name,
 						"plant_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-						"grow_time": crop_data.get("grow_time", None)
+						"grow_time": crop_data.get("grow_time", None),
+						"water_time": [],
+						"growth": 0
 					}
 					self.land[y][x] = land_data
+					if (is_save):
+						self.save()
 					return "Done"
 				else:
 					return "Not Empty"
@@ -207,8 +289,27 @@ class Farmland: #耕地类
 		else:
 			return "Not In"
 
+	def water(self, x, y, time = datetime.datetime.now(), is_save = True):
+		if (self.is_in(x, y)):
+			land = self.land[y][x]
+			if (self.get_state(x, y) == "Growing"):
+				if (land["state"] == "dry"):
+					crop_data = DataFile("[DATA]/farm/data").get_raw("crop.json").get(land["display_name"], None)
+					self.land[y][x]["state"] = "wet"
+					end = time + datetime.timedelta(minutes = crop_data["water_time"])
+					self.land[y][x]["water_time"].append([time.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S")])
+					if (is_save):
+						self.save()
+					return "Done"
+				else:
+					return "Not Dry"
+			else:
+				return "Can Not"
+		else:
+			return "Not In"
+
 def get_src(spath):
-	return Image.open(os.path.join(src_path, f"{spath}.png"))
+	return Image.open(os.path.join(src_path, f"{spath}.png")).convert("RGBA")
 
 def get_id(item, items):
 	return items.index(item)

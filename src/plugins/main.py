@@ -65,7 +65,8 @@ LINE = "——————————"
 
 @test.handle()
 async def _(bot: Bot, event: Event):
-	pass
+	d = DataFile("[data]/a.txt")
+	d.set("", "a", "1")
 
 @sendsrc.handle()
 async def _():
