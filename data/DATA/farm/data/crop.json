@@ -1,9 +1,59 @@
 {
 	"胡萝卜": {
 		"name": "carrot",
+		"stage": 7,
 		"grow_time": 240,
-		"water_time": 120,
-		"price": 50,
-		"seed_cost": 10
+		"water_time": 121,
+		"price": {
+			"胡萝卜": 10,
+			"巨大胡萝卜": 30
+		},
+		"seed_cost": 10,
+		"wilt": 48,
+		"harvest": [
+			{
+				"condition": null,
+				"type": "set",
+				"amount": [1, 3],
+				"star": [0, 1]
+			},
+			{
+				"condition": ["water_period < 60"],
+				"type": "add",
+				"amount": [0, 0],
+				"star": [1, 0]
+			},
+			{
+				"condition": ["add_growth > 0"],
+				"type": "add",
+				"amount": [0, 1]
+			},
+			{
+				"condition": ["growth > 300"],
+				"type": "add",
+				"amount": [0, 0],
+				"star": [1, 1]
+			},
+			{
+				"condition": ["growth > 300", "add_growth > 60"],
+				"type": "set",
+				"amount": 1,
+				"star": [4, 6],
+				"name": "巨大胡萝卜"
+			}
+		],
+		"special_stage": [
+			{
+				"condition": ["growth > 300", "add_growth > 60"],
+				"src": "huge"
+			}
+		]
+	},
+	"枯枯": {
+		"name": "wilt",
+		"stage": 1,
+		"grow_time": 0.1,
+		"water_time": 1,
+		"price": 10
 	}
 }
