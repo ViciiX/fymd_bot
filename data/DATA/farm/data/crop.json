@@ -53,7 +53,31 @@
 		"name": "wilt",
 		"stage": 1,
 		"grow_time": 0.1,
-		"water_time": 1,
-		"price": 10
+		"water_time": 0.2,
+		"price": {
+			"枯枯": 1,
+			"枯枯不哭哭": 10
+		},
+		"harvest": [
+			{
+				"condition": null,
+				"type": "set",
+				"amount": [1, 1],
+				"star": [0, 1]
+			},
+			{
+				"condition": ["water_times >= 5"],
+				"type": "set",
+				"amount": [1, 1],
+				"star": 1,
+				"name": "枯枯不哭哭"
+			}
+		],
+		"special_stage": [
+			{
+				"condition": ["water_times >= 5"],
+				"src": "happy"
+			}
+		]
 	}
 }

@@ -29,6 +29,14 @@ water = on_regex("^浇水 (\\d+) (\\d+)$")
 uproot = on_regex("^铲除 (\\d+) (\\d+)$")
 fertilize = on_regex("^施肥 (\\d+) (\\d+) (\\d+)$")
 harvest = on_regex("^收获 (\\d+) (\\d+)$")
+sell = on_regex("^售卖 (\\d+) (\\d+)$")
+
+batch_plant = on_regex("^批量播种 (\\d+) (\\d+) (\\d+) (\\d+) (.+)$")
+batch_water = on_regex("^批量浇水 (\\d+) (\\d+) (\\d+) (\\d+)$")
+batch_uproot = on_regex("^批量铲除 (\\d+) (\\d+) (\\d+) (\\d+)$")
+batch_fertilize = on_regex("^批量施肥 (\\d+) (\\d+) (\\d+) (\\d+) (\\d+)$")
+batch_harvest = on_regex("^批量收获 (\\d+) (\\d+) (\\d+) (\\d+)$")
+
 
 @myland.handle()
 async def _(bot: Bot, event: Event):
@@ -54,7 +62,7 @@ async def _(bot: Bot, event: Event):
 	other_s = Item.format([x for x in fh.items if (x["data"].get("type", None) not in ["crop", "seed"])], "[call:get_id].[name] * [amount]", callables = {"get_id": [get_id, {"items": fh.items}]})
 	other_s = "空" if (other_s == "") else other_s
 	mes.extend(other_s.split("\n"))
-	mes.append(LINE)
+	mes.extend([LINE, "物品前数字为物品id", "发送“售卖 [物品id] [数量]”来售卖农作物"])
 	await Putil.sending(bot, event)
 	await Putil.reply(storage, event, MessageSegment.image(ImageUtil.text_to_image(mes, None, qq = event.user_id)))
 
@@ -100,9 +108,11 @@ async def _(event: Event, args = RegexGroup()):
 
 @plant.handle()
 async def _(event: Event, args = RegexGroup()):
+	args = list(args)
 	user_data = DataFile(f"[data]/user/{event.user_id}/farm")
 	land = Farmland(user_data.get("farmland.json", "farmland", [{}] * 3), [user_data, "farmland.json", "farmland"])
 	x, y = int(args[0]), int(args[1])
+	args[2] = args[2].split("种子")[0]
 	fh = Item(f"[data]/user/{event.user_id}/farm/storage.json")
 	if (fh.find(f"{args[2]}种子")[1] != None):
 		result = land.plant(x, y, args[2], is_save = False)
@@ -125,7 +135,7 @@ async def _(event: Event, args = RegexGroup()):
 		elif (result == "Not Empty"):
 			await Putil.reply(plant, event, "这块地上还有作物！")
 	else:
-		await Putil.reply(plant, event, "仓库里没有该作物的种子！")
+		await Putil.reply(plant, event, f"仓库里没有“{args[2]}”的种子！")
 
 @water.handle()
 async def _(event: Event, args = RegexGroup()):
@@ -186,12 +196,13 @@ async def _(event: Event, args = RegexGroup()):
 				if (user_data.get("info.json", "free", True) == True):
 					user_data.set("info.json", "free", False)
 					async def time_fertilize():
+						user_data.set("info.json", "free", True)
 						land.save()
 						await Putil.reply(fertilize, event, "施肥成功！")
 					await Putil.reply(fertilize, event, f"施肥中...({5 * amount}s)")
 					delay_job(time_fertilize, 5 * amount)
 				else:
-					await Putil.reply(fertilize, event, "正在准备别的事情！")
+					await Putil.reply(fertilize, event, "正在进行别的行动！")
 			elif (result == "Not In"):
 				await Putil.reply(fertilize, event, "坐标错误！")
 		else:
@@ -216,12 +227,154 @@ async def _(event: Event, args = RegexGroup()):
 			async def time_harvest():
 				user_data.set("info.json", "free", True)
 				land.save()
-				fh.add(result["name"], result["amount"], {"type": "crop", "star": result["star"]})
-				await Putil.reply(harvest, event, f"收获成功！\n✅【{get_star(result["star"])}】{result["name"]} * {result["amount"]} 已收入仓库！")
+				fh.add(**result)
+				await Putil.reply(harvest, event, f"收获成功！\n✅【{get_star(result["data"]["star"])}】{result["name"]} * {result["amount"]} 已收入仓库！")
 			await Putil.reply(harvest, event, f"收获中...(5s)")
 			delay_job(time_harvest, 5)
 		else:
-			await Putil.reply(harvest, event, "正在准备别的事情！")
+			await Putil.reply(harvest, event, "正在进行别的行动！")
+
+@sell.handle()
+async def _(event: Event, args = RegexGroup()):
+	fh = Item(f"[data]/user/{event.user_id}/farm/storage.json")
+	index, amount = int(args[0]), int(args[1])
+	if (0 <= index and index < len(fh.items)):
+		user_data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "农场|售卖农作物"))
+		item = fh.items[index]
+		if (item["data"]["type"] == "crop"):
+			if (fh.reduce(item["name"], amount, item["data"]) != "Not"):
+				price = get_crop_price(item["name"], item["data"]["star"])
+				user_data.add_num("profile", "coin", price * amount)
+				await Putil.reply(sell, event, f"""
+售卖成功！
+[{get_star(item["data"]["star"])}]{item["name"]}
+收入：{price} * {amount} = {price * amount}🦌币
+""".strip())
+			else:
+				await Putil.reply(sell, event, "数量不足！")
+		else:
+			await Putil.reply(sell, event, "只能售卖农作物哦！")
+	else:
+		await Putil.reply(sell, event, "物品id错误！")
+
+@batch_plant.handle()
+async def _(event: Event, args = RegexGroup()):
+	await batch_action(batch_plant, event, args, 
+		action_func = "plant",
+		error_text = {"Not In": "坐标错误！", "Not Found": "种子不存在！", "Not Empty": "这块地不是空的！"},
+		action_name = "播种",
+		delay = 10
+	)
+
+@batch_water.handle()
+async def _(event: Event, args = RegexGroup()):
+	await batch_action(batch_water, event, args, 
+		action_func = "water",
+		error_text = {"Not In": "坐标错误！", "Not Dry": "你已经浇过水啦~", "Can Not": "没什么好浇水的~"},
+		action_name = "浇水",
+		delay = 5
+	)
+
+@batch_uproot.handle()
+async def _(event: Event, args = RegexGroup()):
+	await batch_action(batch_uproot, event, args, 
+		action_func = "uproot",
+		error_text = {"Not In": "坐标错误！", "Can Not": "这块地是空的！"},
+		action_name = "铲除",
+		delay = 10
+	)
+
+@batch_fertilize.handle()
+async def _(event: Event, args = RegexGroup()):
+	await batch_action(batch_fertilize, event, args, 
+		action_func = "fertilize",
+		error_text = {"Not In": "坐标错误！"},
+		action_name = "施肥",
+		delay = 10
+	)
+
+@batch_harvest.handle()
+async def _(event: Event, args = RegexGroup()):
+	await batch_action(batch_harvest, event, args, 
+		action_func = "harvest",
+		error_text = {"Not In": "坐标错误！", "Can Not": "没有成熟的作物！"},
+		action_name = "收获",
+		delay = 5
+	)
+
+async def batch_action(matcher, event, args, action_func, error_text, delay, action_name):
+	args = list(args)
+	user_data = DataFile(f"[data]/user/{event.user_id}/farm")
+	land = Farmland(user_data.get("farmland.json", "farmland", [{}] * 3), [user_data, "farmland.json", "farmland"])
+	if (action_func == "plant"):
+		seed_name = args.pop(-1).split("种子")[0]
+	elif (action_func == "fertilize"):
+		amount = int(args[-1])
+	args = [int(x) for x in args]
+	begin = [min(args[0], args[2]), min(args[1], args[3])]
+	end = [max(args[0], args[2]), max(args[1], args[3])]
+	fh = Item(f"[data]/user/{event.user_id}/farm/storage.json")
+	if (land.is_in_area(*begin) and land.is_in_area(*end)):
+		if (user_data.get("info.json", "free", True) == True):
+			user_data.set("info.json", "free", False)
+			result = {"success": 0, "failed": 0}
+			error = []
+			add_items = []
+			def add_error(x, y, text):
+				result["failed"] += 1
+				error.append(f"❗耕地({x},{y}) --> {text}")
+			def action():
+				for y in range(end[1] - begin[1] + 1):
+					for x in range(end[0] - begin[0] + 1):
+						pos = [begin[0] + x, begin[1] + y]
+
+						if (action_func not in ["plant", "fertilize"] or \
+							(action_func == "plant" and fh.find(f"{seed_name}种子")[1] != None) or \
+							(action_func == "fertilize" and fh.find("肥料")[1] != None and fh.find("肥料")[1]["amount"] >= amount)):
+							if (action_func == "plant"):
+								state = land.plant(x, y, seed_name, is_save = False)
+							elif (action_func == "fertilize"):
+								state = land.fertilize(x, y, amount, is_save = False)
+							elif (action_func == "harvest"):
+								state = land.harvest(x, y, is_save = False)
+								if (type(state) == dict):
+									add_items.append(state)
+									state = "Done"
+							else:
+								state = getattr(land, action_func)(x, y, is_save = False)
+							if (state == "Done"):
+								if (action_func == "plant"):
+									fh.reduce(f"{seed_name}种子", 1)
+								elif (action_func == "fertilize"):
+									fh.reduce("肥料", amount)
+								result["success"] += 1
+							else:
+								add_error(x, y, error_text[state])
+						else:
+							if (action_func == "plant"):
+								add_error(x, y, "种子不足！")
+							elif (action_func == "fertilize"):
+								add_error(x, y, "肥料不足！")
+							return
+			action()
+			await Putil.reply(matcher, event, f"{action_name}中...({delay * result["success"]}s)")
+			async def time_batch():
+				fh.add_by_list(add_items)
+				user_data.set("info.json", "free", True)
+				land.save()
+				mes = [f"🌱批量{action_name}结果🌱", LINE, f"成功：{result["success"]}次", f"失败：{result["failed"]}次", LINE]
+				if (action_func == "harvest"):
+					mes.append("🎉收获成果：")
+					for item in add_items:
+						mes.append(f"【{get_star(item["data"]["star"])}】{item["name"]} * {item["amount"]}")
+					mes.append(LINE)
+				mes.extend(error)
+				await Putil.reply(matcher, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
+			delay_job(time_batch, delay * result["success"])
+		else:
+			await Putil.reply(matcher, event, "正在进行别的行动！")
+	else:
+		await Putil.reply(matcher, event, "范围过大！")
 
 class Farmland: #耕地类
 	"""
@@ -249,6 +402,8 @@ class Farmland: #耕地类
 		for y in range(self.height):
 			for x in range(self.width):
 				fdata = self.land[y][x]
+				if (fdata == None):
+					continue
 				if (fdata.get("crop", None) != None):
 					#根据浇水时间计算每块地作物的生长时间
 					growth = 0
@@ -265,10 +420,11 @@ class Farmland: #耕地类
 					fertilizer = fdata.get("fertilizer", [0, None])
 					if (fertilizer[0] > 0):
 						last_time = to_datetime(fertilizer[1])
-						self.land[y][x]["fertilizer"][0] -= (dtime - last_time).total_seconds() / 60
-						self.land[y][x]["add_growth"] = fdata.get("add_growth", 0) + (dtime - last_time).total_seconds() / 60
+						consume = min(fertilizer[0], (dtime - last_time).total_seconds() / 60)
+						self.land[y][x]["fertilizer"][0] -= consume
+						self.land[y][x]["add_growth"] = fdata.get("add_growth", 0) + consume
 						self.land[y][x]["fertilizer"][1] = format_datetime(dtime)
-						if (self.land[y][x]["fertilizer"][0] < 0):
+						if (self.land[y][x]["fertilizer"][0] <= 0):
 							self.land[y][x]["fertilizer"] = [0, None]
 
 					fdata = self.land[y][x]
@@ -307,7 +463,7 @@ class Farmland: #耕地类
 			self.height = math.floor(math.sqrt(len(self.land)))
 		self.width = math.ceil(len(self.land) / self.height)
 		#填充空值
-		arr = np.array(self.land + [{}] * (self.width * self.height - len(self.land)))
+		arr = np.array(self.land + [None] * (self.width * self.height - len(self.land)))
 		self.land = arr.reshape(self.height, self.width).tolist()
 	
 	def get_flatten(self):
@@ -334,6 +490,9 @@ class Farmland: #耕地类
 			for x in range(self.width):
 				pos = (x * 32, y * 32 + 64)
 				fdata = self.land[y][x]
+				if (fdata == None):
+					img.paste(get_src("farmland_locked"), pos)
+					continue
 				img.paste(get_src("farmland_wet" if (fdata.get("state", "dry") == "wet") else "farmland_dry"), pos)
 				if (fdata.get("crop", None) != None): #作物
 					plant_time = to_datetime(fdata["plant_time"])
@@ -363,6 +522,8 @@ class Farmland: #耕地类
 			for x in range(self.width):
 				pos = [x * (32 * 8) + 8, y * (32 * 8) + (64 * 8) + 4]
 				fdata = self.land[y][x]
+				if (fdata == None):
+					continue
 				text = f"({x},{y}) 肥力值:{round(fdata.get("fertilizer", [0, None])[0], 2)}"
 				draw.text(xy = pos, text = text, fill = (255, 255, 255, 150), font = font, stroke_width = 2, stroke_fill = (0, 0, 0, 150))
 				if (fdata.get("crop", None) != None):
@@ -387,6 +548,13 @@ class Farmland: #耕地类
 		return ImageUtil.img_to_bytesio(img) if (in_bytes) else img
 
 	def is_in(self, x, y):
+		try:
+			land = self.land[y][x]
+			return land != None
+		except Exception:
+			return False
+
+	def is_in_area(self, x, y):
 		try:
 			self.land[y][x]
 			return True
@@ -430,7 +598,7 @@ class Farmland: #耕地类
 						"grow_time": crop_data.get("grow_time", None),
 						"water_time": [],
 						"growth": 0,
-						"fertilizer": [land.get("fertilizer", [0, None])[0], format_datetime(time)],
+						"fertilizer": [land.get("fertilizer", [0, None])[0], format_datetime(time) if (land.get("fertilizer", [0, None])[0] != 0) else None],
 						"add_growth": 0
 					}
 					self.set(x, y, land_data, is_save)
@@ -468,7 +636,7 @@ class Farmland: #耕地类
 			land = self.land[y][x]
 			if (self.get_state(x, y) in ["Mature", "Growing"]):
 				self.set(x, y, {
-					"fertilizer": self.get(x, y, "fertilizer", [0, None])
+					"fertilizer": [self.get(x, y, "fertilizer", [0, None])[0], None]
 				}, is_save)
 				return "Done"
 			else:
@@ -481,8 +649,8 @@ class Farmland: #耕地类
 		if (self.is_in(x, y)):
 			land = self.land[y][x]
 			fertilizer = land.get("fertilizer", [0, None])
-			fertilizer[0] += value
-			fertilizer[1] = format_datetime(time) if (fertilizer[1] == None) else fertilizer[1]
+			fertilizer[0] += value * 120
+			fertilizer[1] = format_datetime(time) if (fertilizer[1] == None and self.get(x, y, "crop", None) != None) else fertilizer[1]
 			self.land[y][x]["fertilizer"] = fertilizer
 			if (is_save == True):
 				self.save()
@@ -512,13 +680,17 @@ class Farmland: #耕地类
 							star = [x + y for x, y in zip(expr.get("star", [0, 0]), star)]
 						name = expr.get("name", name)
 
+				print(name, amount, star)
 				amount = random.randint(amount[0], amount[1]) if (type(amount) == list) else amount
 				star = random.randint(star[0], star[1]) if (type(star) == list) else star
 				self.uproot(x, y, is_save)
 				return {
 					"name": name,
 					"amount": amount,
-					"star": star
+					"data": {
+						"type": "crop",
+						"star": star
+					}
 				}
 			else:
 				return "Can Not"
@@ -533,7 +705,7 @@ class Farmland: #耕地类
 				return True
 			for cond in condition:
 				cond = cond.split(" ")
-				for i in range(3):
+				for i in range(len(cond)):
 					token = cond[i]
 					if (token == "growth"):
 						cond[i] = land.get("growth", 0)
@@ -549,10 +721,23 @@ class Farmland: #耕地类
 								value = min(value, period) if (value > 0) else period
 							last = to_datetime(end)
 						cond[i] = value
+					elif (token == "water_times"):
+						cond[i] = len(land.get("water_time", []))
 				result.append(eval("".join([str(x) for x in cond]), {"__builtins__": None}, {}))
 			return all(result)
 		else:
 			return "Not In"
+
+def get_crop_price(crop_name, star):
+	crop_data = DataFile("[DATA]/farm/data").get_raw("crop.json")
+	prices = [value["price"] if (type(value["price"]) == dict) else {name: value["price"]} for name, value in crop_data.items()]
+	all_price = dict()
+	for price in prices:
+		all_price.update(price)
+	if (crop_name in all_price):
+		return round(all_price[crop_name] * (1 + star * 0.5))
+	else:
+		return None
 
 def get_src(spath):
 	return Image.open(os.path.join(src_path, f"{spath}.png")).convert("RGBA")
@@ -561,7 +746,7 @@ def get_id(item, items):
 	return items.index(item)
 
 def get_star(num):
-	return "★" * num
+	return "★" * num if (num > 0) else "普通"
 
 def to_datetime(string):
 	return datetime.datetime.strptime(string, "%Y-%m-%d %H:%M:%S")

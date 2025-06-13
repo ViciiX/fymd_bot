@@ -1,5 +1,5 @@
 import qrcode, random, math
-from PIL import Image, ImageFilter, ImageFont
+from PIL import Image, ImageFilter, ImageFont, ImageDraw
 from io import BytesIO
 from pilmoji import Pilmoji
 
@@ -72,9 +72,13 @@ def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "
 	height = max(min_size[1], margin * 2 + round(font.getbbox("汉字")[3] * 1.5) * len(texts))
 	
 	with Image.new(mode = "RGBA", size = (width, height), color = bg_color) as img:
-		with Pilmoji(img) as draw:
-			draw.text(xy = (margin, margin), text = "\n".join(texts), fill = font_color, font = font, emoji_scale_factor = 0.9)
-			return img_to_bytesio(img) if (in_bytes) else img
+		try:
+			with Pilmoji(img) as draw:
+				draw.text(xy = (margin, margin), text = "\n".join(texts), fill = font_color, font = font, emoji_scale_factor = 0.9)
+		except Exception:
+			draw = ImageDraw(img)
+			draw.text(xy = (margin, margin), text = "\n".join(texts), fill = font_color, font = font)
+		return img_to_bytesio(img) if (in_bytes) else img
 
 def get_color_avaliable(color):
 	try:
