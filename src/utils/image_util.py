@@ -76,7 +76,7 @@ def text_to_image(raw_texts, width = "square", bg_color = "white", font_name = "
 			with Pilmoji(img) as draw:
 				draw.text(xy = (margin, margin), text = "\n".join(texts), fill = font_color, font = font, emoji_scale_factor = 0.9)
 		except Exception:
-			draw = ImageDraw(img)
+			draw = ImageDraw.Draw(img)
 			draw.text(xy = (margin, margin), text = "\n".join(texts), fill = font_color, font = font)
 		return img_to_bytesio(img) if (in_bytes) else img
 

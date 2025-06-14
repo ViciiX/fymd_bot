@@ -36,7 +36,9 @@ batch_water = on_regex("^批量浇水 (\\d+) (\\d+) (\\d+) (\\d+)$")
 batch_uproot = on_regex("^批量铲除 (\\d+) (\\d+) (\\d+) (\\d+)$")
 batch_fertilize = on_regex("^批量施肥 (\\d+) (\\d+) (\\d+) (\\d+) (\\d+)$")
 batch_harvest = on_regex("^批量收获 (\\d+) (\\d+) (\\d+) (\\d+)$")
+batch_sell = on_regex("^批量售卖(( \\d+[,，/]\\d+)+)$")
 
+befree = on_fullmatch("行动修复")
 
 @myland.handle()
 async def _(bot: Bot, event: Event):
@@ -117,10 +119,8 @@ async def _(event: Event, args = RegexGroup()):
 	if (fh.find(f"{args[2]}种子")[1] != None):
 		result = land.plant(x, y, args[2], is_save = False)
 		if (result == "Done"):
-			if (user_data.get("info.json", "free", True) == True):
-				user_data.set("info.json", "free", False)
+			if (check_work_time(user_data, 10)):
 				async def time_plant():
-					user_data.set("info.json", "free", True)
 					land.save()
 					fh.reduce(f"{args[2]}种子", 1)
 					await Putil.reply(plant, event, "播种成功！")
@@ -144,10 +144,8 @@ async def _(event: Event, args = RegexGroup()):
 	x, y = int(args[0]), int(args[1])
 	result = land.water(x, y, is_save = False)
 	if (result == "Done"):
-		if (user_data.get("info.json", "free", True) == True):
-			user_data.set("info.json", "free", False)
+		if (check_work_time(user_data, 5)):
 			async def time_water():
-				user_data.set("info.json", "free", True)
 				land.save()
 				await Putil.reply(water, event, "浇水成功！")
 			await Putil.reply(water, event, "浇水中...(5s)")
@@ -168,10 +166,8 @@ async def _(event: Event, args = RegexGroup()):
 	x, y = int(args[0]), int(args[1])
 	state = land.uproot(x, y, is_save = False)
 	if (state == "Done"):
-		if (user_data.get("info.json", "free", True) == True):
-			user_data.set("info.json", "free", False)
+		if (check_work_time(user_data, 10)):
 			async def time_uproot():
-				user_data.set("info.json", "free", True)
 				land.save()
 				await Putil.reply(uproot, event, "成功铲除！")
 			await Putil.reply(uproot, event, "铲除中...(10s)")
@@ -191,12 +187,10 @@ async def _(event: Event, args = RegexGroup()):
 	fh = Item(f"[data]/user/{event.user_id}/farm/storage.json")
 	if (fh.find("肥料")[1] != None):
 		if (fh.reduce("肥料", amount) != "Not"):
-			result = land.fertilize(x, y, 120 * amount, is_save = False)
+			result = land.fertilize(x, y, amount, is_save = False)
 			if (result == "Done"):
-				if (user_data.get("info.json", "free", True) == True):
-					user_data.set("info.json", "free", False)
+				if (check_work_time(5 * amount)):
 					async def time_fertilize():
-						user_data.set("info.json", "free", True)
 						land.save()
 						await Putil.reply(fertilize, event, "施肥成功！")
 					await Putil.reply(fertilize, event, f"施肥中...({5 * amount}s)")
@@ -222,13 +216,15 @@ async def _(event: Event, args = RegexGroup()):
 	elif (result == "Can Not"):
 		await Putil.reply(harvest, event, "没有成熟的作物！")
 	else:
-		if (user_data.get("info.json", "free", True) == True):
-			user_data.set("info.json", "free", False)
+		if (check_work_time(user_data, 5)):
 			async def time_harvest():
-				user_data.set("info.json", "free", True)
 				land.save()
-				fh.add(**result)
-				await Putil.reply(harvest, event, f"收获成功！\n✅【{get_star(result["data"]["star"])}】{result["name"]} * {result["amount"]} 已收入仓库！")
+				fh.add_by_list(result)
+				mes = ["收获成功！", LINE]
+				for item in result:
+					mes.append(f"✅【{get_star(item["data"]["star"])}】{item["name"]} * {item["amount"]}")
+				mes.extend([LINE, "已收入仓库！"])
+				await Putil.reply(harvest, event, "\n".join(mes))
 			await Putil.reply(harvest, event, f"收获中...(5s)")
 			delay_job(time_harvest, 5)
 		else:
@@ -302,6 +298,55 @@ async def _(event: Event, args = RegexGroup()):
 		delay = 5
 	)
 
+@befree.handle()
+async def _(event: Event):
+	user_data = DataFile(f"[data]/user/{event.user_id}/farm")
+	if (user_data.get("info.json", "free", True) == False):
+		work_time = user_data.get("info.json", "work_time", format_datetime(datetime.datetime.now()))
+		work_time = to_datetime(work_time)
+		if (work_time <= datetime.datetime.now()):
+			user_data.set("info.json", "free", True)
+			await Putil.reply(befree, event, "OK了！")
+		else:
+			await Putil.reply(befree, event, f"根据历史记录，上次行动的截止时间是{format_datetime(work_time)}")
+	else:
+		await Putil.reply(befree, event, "没问题啊？")
+
+@batch_sell.handle()
+async def _(bot: Bot, event: Event, args = RegexGroup()):
+	await Putil.processing(bot, event)
+	args = [Util.multi_split(x, [",", "，", "/", "+", "-", "*", "."]) for x in args[0].strip().split(" ")]
+	args.sort(key = lambda x: x[0], reverse = True)
+	result = {"success": 0, "failed": 0}
+	error = []
+	success = []
+	def add_error(text):
+		result["failed"] += 1
+		error.append(f"❗{text}")
+	def add_success(text):
+		result["success"] += 1
+		error.append(f"✅{text}")
+	fh = Item(f"[data]/user/{event.user_id}/farm/storage.json")
+	for arg in args:
+		index, amount = int(arg[0]), int(arg[1])
+		if (0 <= index and index < len(fh.items)):
+			user_data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "农场|售卖农作物"))
+			item = fh.items[index]
+			if (item["data"]["type"] == "crop"):
+				if (fh.reduce(item["name"], amount, item["data"]) != "Not"):
+					price = get_crop_price(item["name"], item["data"]["star"])
+					user_data.add_num("profile", "coin", price * amount)
+					add_success(f"[{get_star(item["data"]["star"])}]{item["name"]} ==> {price} * {amount} = {price * amount}🦌币")
+				else:
+					add_error("数量不足！")
+			else:
+				add_error("只能售卖农作物哦！")
+		else:
+			add_error("物品id错误！")
+	await Putil.sending(bot, event)
+	mes = ["💰批量售卖结果💰", LINE, f"成功：{result["success"]}次", f"失败：{result["failed"]}次", LINE] + success + [LINE] + error
+	await Putil.reply(batch_sell, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
+
 async def batch_action(matcher, event, args, action_func, error_text, delay, action_name):
 	args = list(args)
 	user_data = DataFile(f"[data]/user/{event.user_id}/farm")
@@ -315,62 +360,66 @@ async def batch_action(matcher, event, args, action_func, error_text, delay, act
 	end = [max(args[0], args[2]), max(args[1], args[3])]
 	fh = Item(f"[data]/user/{event.user_id}/farm/storage.json")
 	if (land.is_in_area(*begin) and land.is_in_area(*end)):
-		if (user_data.get("info.json", "free", True) == True):
-			user_data.set("info.json", "free", False)
-			result = {"success": 0, "failed": 0}
-			error = []
-			add_items = []
-			def add_error(x, y, text):
-				result["failed"] += 1
-				error.append(f"❗耕地({x},{y}) --> {text}")
-			def action():
-				for y in range(end[1] - begin[1] + 1):
-					for x in range(end[0] - begin[0] + 1):
-						pos = [begin[0] + x, begin[1] + y]
+		result = {"success": 0, "failed": 0}
+		error = []
+		def add_error(x, y, text):
+			result["failed"] += 1
+			error.append(f"❗耕地({x},{y}) --> {text}")
+		def action():
+			items = []
+			for y in range(end[1] - begin[1] + 1):
+				for x in range(end[0] - begin[0] + 1):
+					pos = [begin[0] + x, begin[1] + y]
 
-						if (action_func not in ["plant", "fertilize"] or \
-							(action_func == "plant" and fh.find(f"{seed_name}种子")[1] != None) or \
-							(action_func == "fertilize" and fh.find("肥料")[1] != None and fh.find("肥料")[1]["amount"] >= amount)):
-							if (action_func == "plant"):
-								state = land.plant(x, y, seed_name, is_save = False)
-							elif (action_func == "fertilize"):
-								state = land.fertilize(x, y, amount, is_save = False)
-							elif (action_func == "harvest"):
-								state = land.harvest(x, y, is_save = False)
-								if (type(state) == dict):
-									add_items.append(state)
-									state = "Done"
-							else:
-								state = getattr(land, action_func)(x, y, is_save = False)
-							if (state == "Done"):
-								if (action_func == "plant"):
-									fh.reduce(f"{seed_name}种子", 1)
-								elif (action_func == "fertilize"):
-									fh.reduce("肥料", amount)
-								result["success"] += 1
-							else:
-								add_error(x, y, error_text[state])
+					if (action_func not in ["plant", "fertilize"] or \
+						(action_func == "plant" and fh.find(f"{seed_name}种子")[1] != None) or \
+						(action_func == "fertilize" and fh.find("肥料")[1] != None and fh.find("肥料")[1]["amount"] >= amount)):
+						if (action_func == "plant"):
+							state = land.plant(x, y, seed_name, is_save = False)
+						elif (action_func == "fertilize"):
+							state = land.fertilize(x, y, amount, is_save = False)
+						elif (action_func == "harvest"):
+							state = land.harvest(x, y, is_save = False)
+							if (type(state) == list):
+								for item in state:
+									items = Item.value_add(items, **item)
+								state = "Done"
 						else:
+							state = getattr(land, action_func)(x, y, is_save = False)
+						if (state == "Done"):
 							if (action_func == "plant"):
-								add_error(x, y, "种子不足！")
+								fh.reduce(f"{seed_name}种子", 1)
 							elif (action_func == "fertilize"):
-								add_error(x, y, "肥料不足！")
-							return
-			action()
-			await Putil.reply(matcher, event, f"{action_name}中...({delay * result["success"]}s)")
+								fh.reduce("肥料", amount)
+							result["success"] += 1
+						else:
+							add_error(x, y, error_text[state])
+					else:
+						if (action_func == "plant"):
+							add_error(x, y, "种子不足！")
+						elif (action_func == "fertilize"):
+							add_error(x, y, "肥料不足！")
+						return
+			result["items"] = items
+		action()
+		delay = delay * result["success"]
+		if (action_func == "fertilize"):
+			delay *= amount
+
+		if (check_work_time(user_data, delay)):
+			await Putil.reply(matcher, event, f"{action_name}中...({delay}s)")
 			async def time_batch():
-				fh.add_by_list(add_items)
-				user_data.set("info.json", "free", True)
+				fh.add_by_list(result.get("items", []))
 				land.save()
 				mes = [f"🌱批量{action_name}结果🌱", LINE, f"成功：{result["success"]}次", f"失败：{result["failed"]}次", LINE]
 				if (action_func == "harvest"):
 					mes.append("🎉收获成果：")
-					for item in add_items:
+					for item in result.get("items", []):
 						mes.append(f"【{get_star(item["data"]["star"])}】{item["name"]} * {item["amount"]}")
 					mes.append(LINE)
 				mes.extend(error)
 				await Putil.reply(matcher, event, MessageSegment.image(ImageUtil.text_to_image(mes, width = None, qq = event.user_id)))
-			delay_job(time_batch, delay * result["success"])
+			delay_job(time_batch, delay)
 		else:
 			await Putil.reply(matcher, event, "正在进行别的行动！")
 	else:
@@ -680,18 +729,16 @@ class Farmland: #耕地类
 							star = [x + y for x, y in zip(expr.get("star", [0, 0]), star)]
 						name = expr.get("name", name)
 
-				print(name, amount, star)
+				items = []
 				amount = random.randint(amount[0], amount[1]) if (type(amount) == list) else amount
-				star = random.randint(star[0], star[1]) if (type(star) == list) else star
-				self.uproot(x, y, is_save)
-				return {
-					"name": name,
-					"amount": amount,
-					"data": {
+				for i in range(amount):
+					items = Item.value_add(items, name, 1, {
 						"type": "crop",
-						"star": star
-					}
-				}
+						"star": random.randint(star[0], star[1]) if (type(star) == list) else star
+					})
+				print("harvest:", items)
+				self.uproot(x, y, is_save)
+				return items
 			else:
 				return "Can Not"
 		else:
@@ -756,3 +803,12 @@ def format_datetime(dtime):
 
 def delay_job(func, seconds):
 	scheduler.add_job(func, "date", run_date = datetime.datetime.now() + datetime.timedelta(seconds = seconds))
+
+def check_work_time(udata, delay):
+	work_time = udata.get("info.json", "work_time", None)
+	dtime = datetime.datetime.now()
+	if (work_time == None or to_datetime(work_time) <= dtime):
+		udata.set("info.json", "work_time", format_datetime(dtime + datetime.timedelta(seconds = delay)))
+		return True
+	else:
+		return False

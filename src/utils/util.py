@@ -84,3 +84,12 @@ def zip_dir(dirpath, outFullName, exclude_dirs = []):
 		for filename in filenames:
 			zip.write(os.path.join(path, filename), os.path.join(fpath, filename))
 	zip.close()
+
+def multi_split(string, chars: list):
+	result = [string]
+	for char in chars:
+		l = []
+		for text in result:
+			l.extend(text.split(char))
+		result = l
+	return result

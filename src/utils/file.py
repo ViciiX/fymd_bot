@@ -296,8 +296,8 @@ class Item:
 		item = self.find(tname, tdata)[1]
 		return num_range[0] <= item["amount"] and item["amount"] < num_range[1] 
 
-	def add(self, tname, amount, tdata = None, is_save = True):
-		self.items = Item.value_add(self.items, tname, amount, tdata)
+	def add(self, name, amount, data = None, is_save = True):
+		self.items = Item.value_add(self.items, name, amount, data)
 		if (is_save):
 			self.save()
 
