@@ -43,7 +43,7 @@ async def _():
 		deadline = values.get("deadline", None)
 		if (deadline != None):
 			deadline = datetime.datetime.strptime(deadline, "%Y-%m-%d %H:%M:%S")
-			if (dtime >= deadline):
+			if (dtime >= deadline and values.get("avaliable") == True):
 				pool_data = data.get("cards.json", pool_name, {})
 				pool_data["avaliable"] = False
 				data.set("cards.json", pool_name, pool_data)
