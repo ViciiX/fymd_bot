@@ -1,4 +1,4 @@
-import math, random, os, math, zipfile, qrcode
+import math, random, os, math, zipfile, qrcode, shutil
 from PIL import Image, ImageFilter
 from io import BytesIO
 from nonebot.adapters.onebot.v11 import Message
@@ -93,3 +93,6 @@ def multi_split(string, chars: list):
 			l.extend(text.split(char))
 		result = l
 	return result
+
+def del_dir(path):
+	shutil.rmtree(path)

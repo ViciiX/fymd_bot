@@ -1,0 +1,49 @@
+dir_rule:
+  base_dir: ./data/JMdownload/
+
+# 下载配置
+download:
+  cache: true # 如果要下载的文件在磁盘上已存在，不用再下一遍了吧？默认为true
+  image:
+    decode: true # JM的原图是混淆过的，要不要还原？默认为true
+    suffix: .jpg # 把图片都转为.jpg格式，默认为null，表示不转换。
+
+client:
+  impl: api
+  retry_times: 2
+
+plugins:
+  after_album:
+    - plugin: img2pdf
+      kwargs:
+        pdf_dir: ./data/JMdownload/pdf # pdf存放文件夹
+        filename_rule: Aname # pdf命名规则，A代表album, name代表使用album.name也就是本子名称
+
+    - plugin: zip # 压缩文件插件
+      kwargs:
+        level: album # 按照章节，一个章节一个压缩文件
+        # level 也可以配成 album，表示一个本子对应一个压缩文件，该压缩文件会包含这个本子的所有章节
+
+        filename_rule: Atitle # 压缩文件的命名规则
+        # 请注意⚠ [https://github.com/hect0x7/JMComic-Crawler-Python/issues/223#issuecomment-2045227527]
+        # filename_rule和level有对应关系
+        # 如果level=[photo], filename_rule只能写Pxxx
+        # 如果level=[album], filename_rule只能写Axxx
+
+        zip_dir: ./data/JMdownload/ # 压缩文件存放的文件夹
+
+        suffix: zip #压缩包后缀名，默认值为zip，可以指定为zip或者7z
+
+        # v2.6.0 以后，zip插件也支持dir_rule配置项，可以替代旧版本的zip_dir和filename_rule
+        # 请注意⚠ 使用此配置项会使filename_rule，zip_dir，suffix三个配置项无效，与这三个配置项同时存在时仅会使用dir_rule
+        # 示例如下:
+        # dir_rule: # 新配置项，可取代旧的zip_dir和filename_rule
+        #   base_dir: D:/jmcomic-zip
+        #   rule: 'Bd / {Atitle} / [{Pid}]-{Ptitle}.zip'  # 设置压缩文件夹规则，中间Atitle表示创建一层文件夹，名称是本子标题。[{Pid}]-{Ptitle}.zip 表示压缩文件的命名规则(需显式写出后缀名)
+        # 使用此方法指定压缩包存储路径则无需和level对应
+
+        delete_original_file: true # 压缩成功后，删除所有原文件和文件夹
+        
+        # 在v2.6.0及以后版本，zip插件还支持设置密码和加密方式，使用encrypt配置项，该配置是可选的
+        encrypt:
+          password: fymd

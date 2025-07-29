@@ -758,6 +758,8 @@ class Farmland: #耕地类
 						cond[i] = land.get("growth", 0)
 					elif (token == "add_growth"):
 						cond[i] = land.get("add_growth", 0)
+					elif (token == "grow_time"):
+						cond[i] = land.get("grow_time", None)
 					elif (token == "water_period"):
 						value = 0
 						last = None

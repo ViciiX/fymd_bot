@@ -20,10 +20,23 @@ from ..utils import plugin_util as Putil
 from ..utils import image_util as ImageUtil
 
 headers = {
-    "accept-language": "zh-CN,zh;q=0.9",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-    "Cookie": "PHPSESSID=qr3lo2kohij1g5vvj3osabj3a7; age=verified; existmag=mag"
+    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'accept-language': 'zh-CN,zh;q=0.9',
+    'cache-control': 'no-cache',
+    'pragma': 'no-cache',
+    'priority': 'u=0, i',
+    'sec-ch-ua': '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'document',
+    'sec-fetch-mode': 'navigate',
+    'sec-fetch-site': 'none',
+    'sec-fetch-user': '?1',
+    'upgrade-insecure-requests': '1',
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+    'cookie': 'existmag=mag; PHPSESSID=3in5q617j6rpeqvscl408ml3b5',
 }
+
 proxy = "http://127.0.0.1:7897"
 main_url = "https://www.javbus.com/"
 
@@ -70,7 +83,9 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 	await Putil.ban(get_code_info, event)
 	data = DataFile(f"[data]/user/{event.user_id}", Logger(f"[data]/user/{event.user_id}/log/coin.log", "获取车牌号"))
 	if (data.remove_num("profile", "coin", 1)):
+		print(1)
 		await Putil.processing(bot, event)
+		print(2)
 		try:
 			info = await get_info_from_code(args[0])
 			if (info["status_code"] == 200):
@@ -89,7 +104,7 @@ async def _(bot: Bot, event: Event, args = RegexGroup()):
 					await Putil.sending(bot, event)
 					# for mes in [MessageSegment.image(info["image"]), send_str, "预览："] + [MessageSegment.image(b) for b in info["samples"]]:
 					# 	await get_code_info.send(mes)
-					await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd"]}, [("bot", [MessageSegment.image(info["image"]), send_str, "预览："] + [MessageSegment.image(b) for b in info["samples"]])])
+					await Putil.send_forward_msg(bot, event, {"bot": [Putil.bot_id, "FyMd"]}, [("bot", [MessageSegment.image(info["image"]), send_str, "预览："] + [MessageSegment.image(b) for b in info["samples"] if (b != -1)])])
 				except MatcherException:
 					pass
 				except Exception as e:
@@ -227,7 +242,7 @@ async def get_info_from_code(code):
 				sample_urls = [x.get("href") for x in cont.find_all("a")]
 				print(sample_urls)
 				sample_bytes = [get_img(u, img_header) for u in sample_urls]
-				result["samples"] = [r["img"] for r in await asyncio.gather(*sample_bytes)]
+				result["samples"] = [r["img"] if (r.get("status_code", -1) != -1) else -1 for r in await asyncio.gather(*sample_bytes)]
 				return result
 			else:
 				return {'status_code': response.status}
@@ -290,6 +305,10 @@ async def get_nsfw_img(is_today = False):
 
 async def get_img(url, headers = None, is_proc = True, timeout = 20, proxy = proxy):
 	result = await get_bytes(url, headers, timeout, proxy)
+	if (result["status_code"] == -1):
+		return {
+		  "status_code": -1
+		}
 	if (is_proc):
 		result["bytes"] = ImageUtil.img_process(result["bytes"]).getvalue()
 	result["img"] = result.pop("bytes")

@@ -26,16 +26,16 @@
 			{
 				"condition": ["add_growth > 0"],
 				"type": "add",
-				"amount": [0, 1]
+				"amount": [0, 2]
 			},
 			{
-				"condition": ["growth > 300"],
+				"condition": ["growth > grow_time + 60"],
 				"type": "add",
 				"amount": [0, 0],
 				"star": [1, 1]
 			},
 			{
-				"condition": ["growth > 300", "add_growth > 60"],
+				"condition": ["growth > grow_time + 60", "add_growth > 60"],
 				"type": "set",
 				"amount": 1,
 				"star": [4, 6],
@@ -44,7 +44,7 @@
 		],
 		"special_stage": [
 			{
-				"condition": ["growth > 300", "add_growth > 60"],
+				"condition": ["growth > grow_time + 60", "add_growth > 60"],
 				"src": "huge"
 			}
 		]
